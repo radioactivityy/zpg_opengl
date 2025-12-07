@@ -108,7 +108,7 @@ PxRigidStatic* PhysicsManager::CreateCollisionFromOBJ(const std::string& obj_pat
                 std::string index_str = (slash_pos != std::string::npos)
                     ? vertex_str.substr(0, slash_pos)
                     : vertex_str;
-
+                
                 int index = std::stoi(index_str);
                 // OBJ indices are 1-based, convert to 0-based
                 face_indices.push_back(static_cast<uint32_t>(index > 0 ? index - 1 : vertices.size() + index));
