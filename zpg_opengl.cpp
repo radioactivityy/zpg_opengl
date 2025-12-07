@@ -40,13 +40,35 @@ int main()
         auto& chest_transform = rasteriser.GetRegistry().get<component::Transform>(chest);
         chest_transform.translation = glm::vec3(5, 0, 0);
 
-        // Grass - add with Grass component for special rendering
-        auto grass = rasteriser.CreateEntity("../../data/grass/grass.obj", "Grass");
-        rasteriser.GetRegistry().emplace<component::Grass>(grass);  // Tag as grass for special shader
-        auto& grass_transform = rasteriser.GetRegistry().get<component::Transform>(grass);
-        grass_transform.translation = glm::vec3(0, -5, 0);  // Position in front of house
-        grass_transform.scale = glm::vec3(5.0f);  // Scale up to be visible
-        grass_transform.update_model_matrix();
+        // Grass - create multiple grass clumps around the house
+        // Use a simple grid pattern with some randomization
+        std::vector<glm::vec3> grass_positions = {
+            // Front of house
+            glm::vec3(-8, -6, 0), glm::vec3(-6, -7, 0), glm::vec3(-4, -6, 0), glm::vec3(-2, -7, 0),
+            glm::vec3(0, -6, 0), glm::vec3(2, -7, 0), glm::vec3(4, -6, 0), glm::vec3(6, -7, 0),
+            glm::vec3(-7, -5, 0), glm::vec3(-5, -4, 0), glm::vec3(-3, -5, 0), glm::vec3(-1, -4, 0),
+            glm::vec3(1, -5, 0), glm::vec3(3, -4, 0), glm::vec3(5, -5, 0), glm::vec3(7, -4, 0),
+            // Left side
+            glm::vec3(-9, -3, 0), glm::vec3(-9, -1, 0), glm::vec3(-9, 1, 0), glm::vec3(-9, 3, 0),
+            glm::vec3(-10, 0, 0), glm::vec3(-10, 2, 0), glm::vec3(-10, 4, 0),
+            // Right side
+            glm::vec3(10, -3, 0), glm::vec3(10, -1, 0), glm::vec3(10, 1, 0), glm::vec3(10, 3, 0),
+            glm::vec3(11, 0, 0), glm::vec3(11, 2, 0), glm::vec3(11, 4, 0),
+            // Behind house
+            glm::vec3(-6, 10, 0), glm::vec3(-4, 11, 0), glm::vec3(-2, 10, 0), glm::vec3(0, 11, 0),
+            glm::vec3(2, 10, 0), glm::vec3(4, 11, 0), glm::vec3(6, 10, 0),
+        };
+
+        for (size_t i = 0; i < grass_positions.size(); i++) {
+            auto grass = rasteriser.CreateEntity("../../data/grass/grass.obj", "Grass" + std::to_string(i));
+            rasteriser.GetRegistry().emplace<component::Grass>(grass);
+            auto& grass_transform = rasteriser.GetRegistry().get<component::Transform>(grass);
+            grass_transform.translation = grass_positions[i];
+            // Vary scale slightly for natural look
+            float scale_var = 2.0f + (i % 3) * 0.5f;
+            grass_transform.scale = glm::vec3(scale_var);
+            grass_transform.update_model_matrix();
+        }
 
         // Start the main loop
         return rasteriser.Show();

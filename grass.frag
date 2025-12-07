@@ -65,26 +65,23 @@ void main(void)
     vec3 V = normalize(camera_pos_ws - position_ws);
     vec3 H = normalize(L + V);
 
-    // Ambient - boost for grass visibility
-    vec3 ambient = ambient_color * diffuse_color * 1.2;
+    // Ambient - keep original grass color
+    vec3 ambient = ambient_color * diffuse_color;
 
-    // Diffuse - wrap lighting for softer look on grass
+    // Diffuse - simpler lighting to preserve grass color
     float NdotL = max(dot(N, L), 0.0);
-    float wrap = 0.5;
-    float wrappedNdotL = max((NdotL + wrap) / (1.0 + wrap), 0.0);
-    vec3 diffuse = wrappedNdotL * light_color * diffuse_color;
+    vec3 diffuse = NdotL * light_color * diffuse_color * 0.8;
 
-    // Minimal specular for grass
-    float shininess = 8.0;
-    float spec = pow(clamp(dot(N, H), 0.0, 1.0), shininess) * 0.1;
-    vec3 specular = spec * light_color * vec3(0.04);
+    // No specular for grass - keeps it matte
+    vec3 specular = vec3(0.0);
 
     // Distance attenuation
     float distance = length(light_ws - position_ws);
     float attenuation = 1.0 / (1.0 + 0.0001 * distance);
 
-    // Final color
-    vec3 result = ambient + attenuation * (diffuse + specular);
+    // Final color - boost green channel slightly for vibrant grass
+    vec3 result = ambient + attenuation * diffuse;
+    result = result * 1.3;  // Brighten grass
 
     // Tone mapping
     result = result / (result + vec3(1.0));
