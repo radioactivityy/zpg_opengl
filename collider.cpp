@@ -25,6 +25,9 @@ PxRigidStatic* PhysicsManager::CreateStaticTriangleMesh(const std::vector<glm::v
     // Use PxPhysics to cook the mesh directly (no separate PxCooking object needed)
     PxTolerancesScale scale = physics_->getTolerancesScale();
     PxCookingParams cookingParams(scale);
+    // Build mesh for both sides (handles inverted normals)
+    cookingParams.midphaseDesc.mBVH34Desc.numPrimsPerLeaf = 4;
+    cookingParams.meshPreprocessParams |= PxMeshPreprocessingFlag::eDISABLE_ACTIVE_EDGES_PRECOMPUTE;
 
     // Cook the mesh in memory
     PxDefaultMemoryOutputStream writeBuffer;
@@ -57,7 +60,13 @@ PxRigidStatic* PhysicsManager::CreateStaticTriangleMesh(const std::vector<glm::v
     }
 
     // Create shape with triangle mesh geometry
-    PxShape* shape = physics_->createShape(PxTriangleMeshGeometry(triangleMesh), *default_material_);
+    // Use exclusive shape for static actor with proper flags for character controller
+    // Enable double-sided collision for triangle mesh
+    PxTriangleMeshGeometry triGeom(triangleMesh);
+    triGeom.meshFlags = PxMeshGeometryFlag::eDOUBLE_SIDED;
+
+    PxShapeFlags shapeFlags = PxShapeFlag::eSCENE_QUERY_SHAPE | PxShapeFlag::eSIMULATION_SHAPE;
+    PxShape* shape = physics_->createShape(triGeom, *default_material_, true, shapeFlags);
 
     if (!shape) {
         std::cerr << "Failed to create shape!" << std::endl;
