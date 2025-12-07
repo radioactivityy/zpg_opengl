@@ -26,11 +26,9 @@ layout(std430, binding = 0) readonly buffer Materials {
     Material materials[];
 };
 
-// Uniform variables
+// Uniform variables (only what we need for grass)
 uniform vec3 light_ws;
 uniform vec3 camera_pos_ws;
-uniform vec3 light_color;
-uniform vec3 ambient_color;
 
 void main(void)
 {
@@ -57,25 +55,9 @@ void main(void)
         discard;
     }
 
-    // Get normal - for grass, use geometric normal (no normal mapping)
-    vec3 N = normalize(normal_ws);
-
-    // Lighting calculations
-    vec3 L = normalize(light_ws - position_ws);
-    vec3 V = normalize(camera_pos_ws - position_ws);
-    vec3 H = normalize(L + V);
-
-    // Simple lighting for grass - preserve original color
-    float NdotL = max(dot(N, L), 0.0);
-
-    // Combine ambient and diffuse, keeping grass color vibrant
-    vec3 result = diffuse_color * (0.4 + 0.6 * NdotL);
-
-    // Slight boost to make grass more visible
-    result = result * 1.5;
-
-    // Simple tone mapping
-    result = result / (result + vec3(1.0));
+    // Simple grass rendering - just show the texture color directly
+    // No complex lighting to preserve the original green color
+    vec3 result = diffuse_color * 1.2;  // Slight brightness boost
 
     // Output with alpha for transparency
     FragColor = vec4(result, alpha);
