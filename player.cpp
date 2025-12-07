@@ -59,7 +59,15 @@ void Player::SetPosition(const glm::vec3& pos) {
 }
 
 void Player::Update(float delta_time) {
-    if (!controller_) return;
+    // Always update camera for mouse look, even without physics controller
+    UpdateCamera();
+
+    if (!controller_) {
+        // No physics controller - just do simple movement without collision
+        HandleMovement(delta_time);
+        position_ += velocity_ * delta_time;
+        return;
+    }
 
     // Handle movement
     HandleMovement(delta_time);
@@ -92,8 +100,6 @@ void Player::Update(float delta_time) {
     // Optional: Check if hit sides (for sliding along walls)
     bool hit_sides = collision_flags & PxControllerCollisionFlag::eCOLLISION_SIDES;
     bool hit_up = collision_flags & PxControllerCollisionFlag::eCOLLISION_UP;
-
-    UpdateCamera();
 }
 
 void Player::HandleMovement(float delta_time) {
