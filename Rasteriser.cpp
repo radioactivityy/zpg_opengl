@@ -2,6 +2,8 @@
 #include <iostream>
 #include <assert.h>
 #include <filesystem>
+#include <cmath>
+#include <algorithm>
 
 void Rasteriser::AddCollisionFromOBJ(const std::string& obj_path, const glm::vec3& position) {
     // Only allow the two specific files
@@ -69,9 +71,10 @@ Rasteriser::Rasteriser() {
     camera_->SetHeight(viewport[3]);
     camera_->SetFOV(45.0);
 
-    camera_->SetPosition(glm::vec3(20, 0, 8));  // Behind and above origin
-    camera_->SetTarget(glm::vec3(0, 0, 0));     // Look at origin
     camera_->SetUp(glm::vec3(0, 0, 1));
+
+    // Initialize camera position using orbit settings
+    UpdateOrbitCamera();
 
     PhysicsManager::Instance().Initialize();
 
@@ -625,14 +628,14 @@ int Rasteriser::Show() {
         glm::mat4 P = camera_->GetProjectionMatrix();
         glm::vec3 camera_pos = camera_->GetPosition();
 
-        // Set lighting uniforms
-        glm::vec3 light_ws(20.0f, 20.0f, 20.0f);
+        // Set lighting uniforms - positioned to illuminate the house well
+        glm::vec3 light_ws(50.0f, 50.0f, 80.0f);
         SetVector3(default_shader_program_, glm::value_ptr(light_ws), "light_ws");
 
-        glm::vec3 light_color(0.7f, 0.7f, 0.7f);
+        glm::vec3 light_color(1.2f, 1.2f, 1.2f);  // Bright white light
         SetVector3(default_shader_program_, glm::value_ptr(light_color), "light_color");
 
-        glm::vec3 ambient(0.1f, 0.1f, 0.1f);
+        glm::vec3 ambient(0.3f, 0.3f, 0.3f);  // Higher ambient for better visibility
         SetVector3(default_shader_program_, glm::value_ptr(ambient), "ambient_color");
 
 
@@ -674,11 +677,66 @@ void Rasteriser::key_callback(GLFWwindow* window, int key, int scancode, int act
     if (rast && rast->player_) {
         rast->player_->ProcessKeyboard(key, action);
     }
+    else if (rast) {
+        // Use orbit camera controls when player is not active
+        rast->ProcessCameraInput(key, action);
+    }
 
     // ESC to close window
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     }
+}
+
+void Rasteriser::ProcessCameraInput(int key, int action) {
+    if (action == GLFW_RELEASE) return;  // Only process press and repeat
+
+    const float angle_step = 0.05f;    // Rotation speed (radians)
+    const float distance_step = 1.0f;  // Zoom speed
+    const float pitch_step = 0.03f;    // Vertical rotation speed
+
+    switch (key) {
+        case GLFW_KEY_D:
+        case GLFW_KEY_RIGHT:
+            orbit_angle_ -= angle_step;  // Rotate right (clockwise)
+            break;
+        case GLFW_KEY_A:
+        case GLFW_KEY_LEFT:
+            orbit_angle_ += angle_step;  // Rotate left (counter-clockwise)
+            break;
+        case GLFW_KEY_W:
+        case GLFW_KEY_UP:
+            orbit_pitch_ += pitch_step;  // Look up
+            orbit_pitch_ = std::min(orbit_pitch_, 1.4f);  // Clamp to ~80 degrees
+            break;
+        case GLFW_KEY_S:
+        case GLFW_KEY_DOWN:
+            orbit_pitch_ -= pitch_step;  // Look down
+            orbit_pitch_ = std::max(orbit_pitch_, -0.2f);  // Clamp to ~-10 degrees
+            break;
+        case GLFW_KEY_Q:
+            orbit_distance_ -= distance_step;  // Zoom in
+            orbit_distance_ = std::max(orbit_distance_, 5.0f);  // Minimum distance
+            break;
+        case GLFW_KEY_E:
+            orbit_distance_ += distance_step;  // Zoom out
+            orbit_distance_ = std::min(orbit_distance_, 100.0f);  // Maximum distance
+            break;
+    }
+
+    UpdateOrbitCamera();
+}
+
+void Rasteriser::UpdateOrbitCamera() {
+    // Calculate camera position on a sphere around the target
+    float x = orbit_distance_ * cos(orbit_pitch_) * cos(orbit_angle_);
+    float y = orbit_distance_ * cos(orbit_pitch_) * sin(orbit_angle_);
+    float z = orbit_distance_ * sin(orbit_pitch_);
+
+    glm::vec3 new_pos = orbit_target_ + glm::vec3(x, y, z);
+
+    camera_->SetPosition(new_pos);
+    camera_->SetTarget(orbit_target_);
 }
 
 void Rasteriser::mouse_callback(GLFWwindow* window, double xpos, double ypos) {
