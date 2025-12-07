@@ -29,11 +29,11 @@ void Player::Initialize(const glm::vec3& spawn_position) {
     // Create character controller configuration
     CharacterControllerConfig config;
     config.position = spawn_position;
-    config.radius = 0.8f;
-    config.height = 1.8f;
+    config.radius = 0.4f;           // Smaller radius to fit through doorways
+    config.height = 1.6f;           // Slightly shorter
     config.step_offset = 0.3f;
     config.slope_limit = 45.0f;
-    config.contact_offset = 0.08f;
+    config.contact_offset = 0.1f;   // Larger contact offset for better wall detection
     config.max_jump_height = 2.0f;
 
     // Create controller

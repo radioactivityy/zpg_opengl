@@ -38,12 +38,20 @@ void main(void)
 {
     // Get material from SSBO
     Material mat = materials[material_index];
-    
-    // Get diffuse color
-    vec3 diffuse_color = mat.diffuse;
+
+    // Get diffuse color with alpha
+    vec4 diffuse_rgba = vec4(mat.diffuse, 1.0);
     if (mat.tex_diffuse != uvec2(0)) {  // Check if not zero
-        diffuse_color = texture(sampler2D(mat.tex_diffuse), tex_coord).rgb;
+        diffuse_rgba = texture(sampler2D(mat.tex_diffuse), tex_coord);
     }
+    vec3 diffuse_color = diffuse_rgba.rgb;
+    float alpha = diffuse_rgba.a;
+
+    // Discard fully transparent fragments (alpha cutoff for grass/foliage)
+    if (alpha < 0.1) {
+        discard;
+    }
+
     // Get normal
     vec3 N = normalize(normal_ws);
     /*if (mat.tex_normal != uvec2(0)) {  // Check if not zero
@@ -95,6 +103,6 @@ void main(void)
     // tone mapping
     result = result / (result + vec3(1.0));
 
-
-   FragColor = vec4(result, 1.0);
+    // Output with alpha for transparency
+    FragColor = vec4(result, alpha);
 }

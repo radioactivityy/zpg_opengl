@@ -25,6 +25,7 @@ public:
     entt::entity CreateEntity(const std::string& mesh_file, const std::string& name, entt::entity parent = entt::null);
     int Show();
     int LoadProgram(const std::string& vs_file_name, const std::string& fs_file_name);
+    int LoadGrassProgram(const std::string& vs_file_name, const std::string& fs_file_name);
 private:
     std::vector<std::shared_ptr<TriangularMesh>> meshes_;
     entt::registry registry_;
@@ -34,6 +35,7 @@ private:
     GLFWwindow* _window;
     std::unique_ptr<Camera> camera_;
     GLuint default_shader_program_{ 0 };
+    GLuint grass_shader_program_{ 0 };  // Grass shader with wind animation
     GLuint materials_ssbo{ 0 };
     std::vector<GLMaterial> materials_;
     std::unique_ptr<Player> player_;
