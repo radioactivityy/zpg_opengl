@@ -45,11 +45,12 @@ void main(void)
     vec3 diffuse_color = diffuse_rgba.rgb;
 
     // Generate alpha from luminance for grass (RGB textures without alpha)
-    // Dark/black pixels become transparent
+    // Dark pixels become transparent
     float luminance = dot(diffuse_color, vec3(0.299, 0.587, 0.114));
 
-    // Use smoothstep for soft edges - pixels darker than 0.15 become transparent
-    float alpha = smoothstep(0.1, 0.3, luminance);
+    // More aggressive threshold - grass textures often have dark (not black) backgrounds
+    // Pixels with luminance below 0.2 become transparent, soft edge up to 0.4
+    float alpha = smoothstep(0.15, 0.35, luminance);
 
     // Discard fully transparent fragments
     if (alpha < 0.1) {

@@ -44,8 +44,8 @@ int main()
         auto grass = rasteriser.CreateEntity("../../data/grass/grass.obj", "Grass");
         rasteriser.GetRegistry().emplace<component::Grass>(grass);  // Tag as grass for special shader
         auto& grass_transform = rasteriser.GetRegistry().get<component::Transform>(grass);
-        grass_transform.translation = glm::vec3(0, 0, 0);  // Position near house
-        grass_transform.scale = glm::vec3(1.0f);
+        grass_transform.translation = glm::vec3(0, -5, 0);  // Position in front of house
+        grass_transform.scale = glm::vec3(5.0f);  // Scale up to be visible
         grass_transform.update_model_matrix();
 
         // Start the main loop
