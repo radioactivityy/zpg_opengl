@@ -85,17 +85,30 @@ PxRigidStatic* PhysicsManager::CreateStaticTriangleMesh(const std::vector<glm::v
 }
 
 PxRigidStatic* PhysicsManager::CreateCollisionFromOBJ(const std::string& obj_path, const glm::vec3& position) {
+    std::cout << "=== Loading collision from: " << obj_path << " ===" << std::endl;
+
     std::ifstream file(obj_path);
     if (!file.is_open()) {
-        std::cerr << "Failed to open OBJ file for collision: " << obj_path << std::endl;
+        std::cerr << "ERROR: Failed to open OBJ file for collision: " << obj_path << std::endl;
+        std::cerr << "Make sure the file path is correct!" << std::endl;
         return nullptr;
     }
 
     std::vector<glm::vec3> vertices;
     std::vector<uint32_t> indices;
 
+    // Track bounding box for debugging
+    glm::vec3 minBounds(FLT_MAX);
+    glm::vec3 maxBounds(-FLT_MAX);
+
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
+        lineNum++;
+
+        // Skip empty lines and comments
+        if (line.empty() || line[0] == '#') continue;
+
         std::istringstream iss(line);
         std::string prefix;
         iss >> prefix;
@@ -103,8 +116,17 @@ PxRigidStatic* PhysicsManager::CreateCollisionFromOBJ(const std::string& obj_pat
         if (prefix == "v") {
             // Vertex position
             float x, y, z;
-            iss >> x >> y >> z;
-            vertices.push_back(glm::vec3(x, y, z));
+            if (iss >> x >> y >> z) {
+                vertices.push_back(glm::vec3(x, y, z));
+
+                // Update bounding box
+                minBounds.x = std::min(minBounds.x, x);
+                minBounds.y = std::min(minBounds.y, y);
+                minBounds.z = std::min(minBounds.z, z);
+                maxBounds.x = std::max(maxBounds.x, x);
+                maxBounds.y = std::max(maxBounds.y, y);
+                maxBounds.z = std::max(maxBounds.z, z);
+            }
         }
         else if (prefix == "f") {
             // Face - parse vertex indices (handles v, v/vt, v/vt/vn, v//vn formats)
@@ -112,22 +134,35 @@ PxRigidStatic* PhysicsManager::CreateCollisionFromOBJ(const std::string& obj_pat
             std::vector<uint32_t> face_indices;
 
             while (iss >> vertex_str) {
-                // Extract vertex index (before first '/')
-                size_t slash_pos = vertex_str.find('/');
-                std::string index_str = (slash_pos != std::string::npos)
-                    ? vertex_str.substr(0, slash_pos)
-                    : vertex_str;
+                try {
+                    // Extract vertex index (before first '/')
+                    size_t slash_pos = vertex_str.find('/');
+                    std::string index_str = (slash_pos != std::string::npos)
+                        ? vertex_str.substr(0, slash_pos)
+                        : vertex_str;
 
-                int index = std::stoi(index_str);
-                // OBJ indices are 1-based, convert to 0-based
-                face_indices.push_back(static_cast<uint32_t>(index > 0 ? index - 1 : vertices.size() + index));
+                    int index = std::stoi(index_str);
+                    // OBJ indices are 1-based, convert to 0-based
+                    uint32_t idx = static_cast<uint32_t>(index > 0 ? index - 1 : vertices.size() + index);
+
+                    // Validate index
+                    if (idx < vertices.size()) {
+                        face_indices.push_back(idx);
+                    } else {
+                        std::cerr << "Warning: Invalid vertex index " << index << " at line " << lineNum << std::endl;
+                    }
+                } catch (const std::exception& e) {
+                    std::cerr << "Warning: Failed to parse face at line " << lineNum << ": " << e.what() << std::endl;
+                }
             }
 
             // Triangulate face (fan triangulation for convex polygons)
-            for (size_t i = 1; i + 1 < face_indices.size(); ++i) {
-                indices.push_back(face_indices[0]);
-                indices.push_back(face_indices[i]);
-                indices.push_back(face_indices[i + 1]);
+            if (face_indices.size() >= 3) {
+                for (size_t i = 1; i + 1 < face_indices.size(); ++i) {
+                    indices.push_back(face_indices[0]);
+                    indices.push_back(face_indices[i]);
+                    indices.push_back(face_indices[i + 1]);
+                }
             }
         }
     }
@@ -135,14 +170,27 @@ PxRigidStatic* PhysicsManager::CreateCollisionFromOBJ(const std::string& obj_pat
     file.close();
 
     if (vertices.empty() || indices.empty()) {
-        std::cerr << "OBJ file has no geometry: " << obj_path << std::endl;
+        std::cerr << "ERROR: OBJ file has no valid geometry: " << obj_path << std::endl;
         return nullptr;
     }
 
-    std::cout << "Loaded collision OBJ: " << vertices.size() << " vertices, "
-              << indices.size() / 3 << " triangles from " << obj_path << std::endl;
+    // Print detailed info
+    std::cout << "Collision mesh loaded successfully:" << std::endl;
+    std::cout << "  Vertices: " << vertices.size() << std::endl;
+    std::cout << "  Triangles: " << indices.size() / 3 << std::endl;
+    std::cout << "  Bounding box min: (" << minBounds.x << ", " << minBounds.y << ", " << minBounds.z << ")" << std::endl;
+    std::cout << "  Bounding box max: (" << maxBounds.x << ", " << maxBounds.y << ", " << maxBounds.z << ")" << std::endl;
+    std::cout << "  Size: (" << (maxBounds.x - minBounds.x) << ", " << (maxBounds.y - minBounds.y) << ", " << (maxBounds.z - minBounds.z) << ")" << std::endl;
 
-    return CreateStaticTriangleMesh(vertices, indices, position);
+    PxRigidStatic* result = CreateStaticTriangleMesh(vertices, indices, position);
+
+    if (result) {
+        std::cout << "=== Collision mesh created successfully! ===" << std::endl;
+    } else {
+        std::cerr << "=== FAILED to create collision mesh! ===" << std::endl;
+    }
+
+    return result;
 }
 
 bool PhysicsManager::Initialize() {
