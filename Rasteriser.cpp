@@ -714,6 +714,20 @@ int Rasteriser::Show() {
 
             // Render grass entities
             auto grass_view = registry_.view<component::Transform, component::Mesh, component::Grass>();
+
+            // Debug: count grass entities (print once)
+            static bool printed_grass_debug = false;
+            if (!printed_grass_debug) {
+                int grass_count = 0;
+                for (auto entity : grass_view) {
+                    grass_count++;
+                    auto& mesh_comp = registry_.get<component::Mesh>(entity);
+                    std::cout << "Grass entity found with " << mesh_comp.gl_meshes.size() << " meshes" << std::endl;
+                }
+                std::cout << "Total grass entities: " << grass_count << std::endl;
+                printed_grass_debug = true;
+            }
+
             for (auto [entity, transform, mesh_component] : grass_view.each()) {
                 glm::mat4 M = transform.get_world_matrix(registry_, entity);
                 glm::mat3 Mn = glm::transpose(glm::inverse(glm::mat3(M)));
