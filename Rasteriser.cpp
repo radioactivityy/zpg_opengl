@@ -84,16 +84,16 @@ Rasteriser::Rasteriser() {
   glfwSetCursorPosCallback(_window, mouse_callback);
   glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
-  // Player controller disabled - using orbit camera instead
-  // player_ = std::make_unique<Player>(camera_.get());
-  // player_->Initialize(glm::vec3(0, -10, 2));
-
-
     // Optional: Add a ground plane for testing
     PhysicsManager::Instance().CreateStaticBox(
         glm::vec3(0, 0, -0.5f),      // position
         glm::vec3(50, 50, 0.5f)      // half extents (50x50x1 box)
     );
+
+  // Enable first-person player controller
+  player_ = std::make_unique<Player>(camera_.get());
+  player_->Initialize(glm::vec3(0, -15, 1));  // Start outside, south of the house
+  player_->SetInitialYaw(90.0f);  // Face north toward the house (0,0,0)
 }
 
 // In Rasteriser.cpp

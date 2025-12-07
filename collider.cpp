@@ -1,6 +1,8 @@
 ﻿#include "Collider.h"
 #include <iostream>
 #include <vector>
+#include <fstream>
+#include <sstream>
 
 
 
@@ -73,6 +75,66 @@ PxRigidStatic* PhysicsManager::CreateStaticTriangleMesh(const std::vector<glm::v
     return actor;
 }
 
+PxRigidStatic* PhysicsManager::CreateCollisionFromOBJ(const std::string& obj_path, const glm::vec3& position) {
+    std::ifstream file(obj_path);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open OBJ file for collision: " << obj_path << std::endl;
+        return nullptr;
+    }
+
+    std::vector<glm::vec3> vertices;
+    std::vector<uint32_t> indices;
+
+    std::string line;
+    while (std::getline(file, line)) {
+        std::istringstream iss(line);
+        std::string prefix;
+        iss >> prefix;
+
+        if (prefix == "v") {
+            // Vertex position
+            float x, y, z;
+            iss >> x >> y >> z;
+            vertices.push_back(glm::vec3(x, y, z));
+        }
+        else if (prefix == "f") {
+            // Face - parse vertex indices (handles v, v/vt, v/vt/vn, v//vn formats)
+            std::string vertex_str;
+            std::vector<uint32_t> face_indices;
+
+            while (iss >> vertex_str) {
+                // Extract vertex index (before first '/')
+                size_t slash_pos = vertex_str.find('/');
+                std::string index_str = (slash_pos != std::string::npos)
+                    ? vertex_str.substr(0, slash_pos)
+                    : vertex_str;
+
+                int index = std::stoi(index_str);
+                // OBJ indices are 1-based, convert to 0-based
+                face_indices.push_back(static_cast<uint32_t>(index > 0 ? index - 1 : vertices.size() + index));
+            }
+
+            // Triangulate face (fan triangulation for convex polygons)
+            for (size_t i = 1; i + 1 < face_indices.size(); ++i) {
+                indices.push_back(face_indices[0]);
+                indices.push_back(face_indices[i]);
+                indices.push_back(face_indices[i + 1]);
+            }
+        }
+    }
+
+    file.close();
+
+    if (vertices.empty() || indices.empty()) {
+        std::cerr << "OBJ file has no geometry: " << obj_path << std::endl;
+        return nullptr;
+    }
+
+    std::cout << "Loaded collision OBJ: " << vertices.size() << " vertices, "
+              << indices.size() / 3 << " triangles from " << obj_path << std::endl;
+
+    return CreateStaticTriangleMesh(vertices, indices, position);
+}
 
 bool PhysicsManager::Initialize() {
     foundation_ = PxCreateFoundation(PX_PHYSICS_VERSION, allocator_, error_callback_);
