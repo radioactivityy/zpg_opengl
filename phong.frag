@@ -85,10 +85,10 @@ void main(void)
     vec3 F0 = mix(vec3(0.04), diffuse_color, metalness);
     vec3 specular = spec * light_color * F0;
     
-    // Distance attenuation
+    // Distance attenuation - very gentle for sun-like lighting
     float distance = length(light_ws - position_ws);
-    float attenuation = 1.0 / (1.0 + 0.001 * distance + 0.0001 * distance * distance);
-    
+    float attenuation = 1.0 / (1.0 + 0.0001 * distance);  // Much gentler falloff
+
     // Final color
     vec3 result = ambient + attenuation * (diffuse + specular);
 

@@ -628,14 +628,14 @@ int Rasteriser::Show() {
         glm::mat4 P = camera_->GetProjectionMatrix();
         glm::vec3 camera_pos = camera_->GetPosition();
 
-        // Set lighting uniforms - positioned to illuminate the house well
-        glm::vec3 light_ws(50.0f, 50.0f, 80.0f);
+        // Set lighting uniforms - sun-like directional light from above
+        glm::vec3 light_ws(30.0f, -30.0f, 60.0f);  // High above and to the side
         SetVector3(default_shader_program_, glm::value_ptr(light_ws), "light_ws");
 
-        glm::vec3 light_color(1.2f, 1.2f, 1.2f);  // Bright white light
+        glm::vec3 light_color(1.8f, 1.8f, 1.7f);  // Bright warm sunlight
         SetVector3(default_shader_program_, glm::value_ptr(light_color), "light_color");
 
-        glm::vec3 ambient(0.3f, 0.3f, 0.3f);  // Higher ambient for better visibility
+        glm::vec3 ambient(0.5f, 0.5f, 0.55f);  // Strong ambient for good fill
         SetVector3(default_shader_program_, glm::value_ptr(ambient), "ambient_color");
 
 
