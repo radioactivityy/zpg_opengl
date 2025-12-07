@@ -84,8 +84,9 @@ Rasteriser::Rasteriser() {
   glfwSetCursorPosCallback(_window, mouse_callback);
   glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
- // player_ = std::make_unique<Player>(camera_.get());
-  //player_->Initialize(glm::vec3(0, -10, 2));
+  // Enable first-person player controller to walk inside the house
+  player_ = std::make_unique<Player>(camera_.get());
+  player_->Initialize(glm::vec3(0, -10, 2));  // Start outside, facing the house
 
 
     // Optional: Add a ground plane for testing
