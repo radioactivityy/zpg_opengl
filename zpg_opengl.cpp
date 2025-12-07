@@ -64,8 +64,8 @@ int main()
             rasteriser.GetRegistry().emplace<component::Grass>(grass);
             auto& grass_transform = rasteriser.GetRegistry().get<component::Transform>(grass);
             grass_transform.translation = grass_positions[i];
-            // Vary scale slightly for natural look
-            float scale_var = 2.0f + (i % 3) * 0.5f;
+            // Grass mesh is tiny (0.4 units) - scale up to ~4-6 units tall
+            float scale_var = 10.0f + (i % 3) * 2.0f;
             grass_transform.scale = glm::vec3(scale_var);
             grass_transform.update_model_matrix();
         }
