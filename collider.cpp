@@ -134,26 +134,15 @@ PxRigidStatic* PhysicsManager::CreateCollisionFromOBJ(const std::string& obj_pat
             std::vector<uint32_t> face_indices;
 
             while (iss >> vertex_str) {
-                try {
-                    // Extract vertex index (before first '/')
-                    size_t slash_pos = vertex_str.find('/');
-                    std::string index_str = (slash_pos != std::string::npos)
-                        ? vertex_str.substr(0, slash_pos)
-                        : vertex_str;
-
-                    int index = std::stoi(index_str);
-                    // OBJ indices are 1-based, convert to 0-based
-                    uint32_t idx = static_cast<uint32_t>(index > 0 ? index - 1 : vertices.size() + index);
-
-                    // Validate index
-                    if (idx < vertices.size()) {
-                        face_indices.push_back(idx);
-                    } else {
-                        std::cerr << "Warning: Invalid vertex index " << index << " at line " << lineNum << std::endl;
-                    }
-                } catch (const std::exception& e) {
-                    std::cerr << "Warning: Failed to parse face at line " << lineNum << ": " << e.what() << std::endl;
-                }
+                // Extract vertex index (before first '/')
+                size_t slash_pos = vertex_str.find('/');
+                std::string index_str = (slash_pos != std::string::npos)
+                    ? vertex_str.substr(0, slash_pos)
+                    : vertex_str;
+                
+                int index = std::stoi(index_str);
+                // OBJ indices are 1-based, convert to 0-based
+                face_indices.push_back(static_cast<uint32_t>(index > 0 ? index - 1 : vertices.size() + index));
             }
 
             // Triangulate face (fan triangulation for convex polygons)
