@@ -20,7 +20,7 @@ int main()
 
         // Load shader programs
         rasteriser.LoadProgram("phong.vert", "phong.frag");
-        rasteriser.LoadGrassProgram("grass.vert", "phong.frag");  // Grass uses same frag shader
+        rasteriser.LoadGrassProgram("grass.vert", "grass.frag");  // Grass shader with luminance-based alpha
 
         // Load collision meshes using PhysicsManager (relative paths)
         PhysicsManager::Instance().CreateCollisionFromOBJ("../../data/old_house/old_house_ground_collision.obj");
