@@ -97,8 +97,4 @@ void main(void)
 
 
    FragColor = vec4(result, 1.0);
-   // FragColor = vec4((normal_ws + vec3(1.0f)) * 0.5, 1.0);
-    //FragColor = vec4(ambient*0 + spec*0 + diffuse, 1.0);
-    FragColor = vec4(diffuse_color * vec3(1.0f) * 0.5, 1.0);
-
 }

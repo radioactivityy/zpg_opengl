@@ -38,7 +38,15 @@ private:
     std::vector<GLMaterial> materials_;
     std::unique_ptr<Player> player_;
 
-    
+    // Camera orbit controls
+    float orbit_angle_{ 0.0f };      // Horizontal angle around target (radians)
+    float orbit_pitch_{ 0.3f };      // Vertical angle (radians)
+    float orbit_distance_{ 25.0f };  // Distance from target
+    glm::vec3 orbit_target_{ 0.0f, 0.0f, 2.0f };  // Point camera orbits around
+
+    void UpdateOrbitCamera();
+    void ProcessCameraInput(int key, int action);
+
     static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
     static void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 };
