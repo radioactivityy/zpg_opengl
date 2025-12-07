@@ -87,7 +87,10 @@ void Player::Update(float delta_time) {
 
     // Move controller
     PxVec3 displacement = ToPxVec3(velocity_ * delta_time);
+
+    // Use default filters - collide with all scene query shapes
     PxControllerFilters filters;
+
     PxControllerCollisionFlags collision_flags = controller_->move(displacement, 0.001f, delta_time, filters);
 
     // Update position
