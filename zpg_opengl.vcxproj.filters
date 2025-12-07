@@ -91,5 +91,8 @@
     <None Include="phong.frag">
       <Filter>Source Files\opengl</Filter>
     </None>
+    <None Include="grass.vert">
+      <Filter>Source Files\opengl</Filter>
+    </None>
   </ItemGroup>
 </Project>
