@@ -33,6 +33,8 @@ public:
     void SetSprintSpeed(float speed) { sprint_speed_ = speed; }
     void SetJumpForce(float force) { jump_force_ = force; }
     void SetMouseSensitivity(float sensitivity) { mouse_sensitivity_ = sensitivity; }
+    void SetInitialYaw(float yaw) { yaw_ = yaw; UpdateCamera(); }
+    void SetInitialPitch(float pitch) { pitch_ = pitch; UpdateCamera(); }
 
 private:
     Camera* camera_;

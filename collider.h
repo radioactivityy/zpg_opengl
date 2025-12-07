@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
+#include <string>
 using namespace physx;
 
 // Character controller configuration
@@ -67,8 +68,11 @@ public:
     // Create material with custom properties
     PxMaterial* CreateMaterial(float static_friction, float dynamic_friction, float restitution);
 
-    // Collder
+    // Collider from vertices/indices
     PxRigidStatic* CreateStaticTriangleMesh(const std::vector<glm::vec3>& vertices, const std::vector<uint32_t>& indices, const glm::vec3& position = glm::vec3(0.0f));
+
+    // Collider from OBJ file - loads OBJ and creates triangle mesh collision
+    PxRigidStatic* CreateCollisionFromOBJ(const std::string& obj_path, const glm::vec3& position = glm::vec3(0.0f));
 
 
     // Getters

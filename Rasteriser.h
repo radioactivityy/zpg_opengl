@@ -43,6 +43,7 @@ private:
     float orbit_pitch_{ 0.3f };      // Vertical angle (radians)
     float orbit_distance_{ 25.0f };  // Distance from target
     glm::vec3 orbit_target_{ 0.0f, 0.0f, 2.0f };  // Point camera orbits around
+    float move_speed_{ 0.5f };       // Speed for moving the target point
 
     void UpdateOrbitCamera();
     void ProcessCameraInput(int key, int action);

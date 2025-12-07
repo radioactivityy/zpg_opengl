@@ -84,15 +84,16 @@ Rasteriser::Rasteriser() {
   glfwSetCursorPosCallback(_window, mouse_callback);
   glfwSetInputMode(_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
- // player_ = std::make_unique<Player>(camera_.get());
-  //player_->Initialize(glm::vec3(0, -10, 2));
-
-
     // Optional: Add a ground plane for testing
     PhysicsManager::Instance().CreateStaticBox(
         glm::vec3(0, 0, -0.5f),      // position
         glm::vec3(50, 50, 0.5f)      // half extents (50x50x1 box)
     );
+
+  // Enable first-person player controller
+  player_ = std::make_unique<Player>(camera_.get());
+  player_->Initialize(glm::vec3(0, -15, 1));  // Start outside, south of the house
+  player_->SetInitialYaw(90.0f);  // Face north toward the house (0,0,0)
 }
 
 // In Rasteriser.cpp
@@ -695,32 +696,57 @@ void Rasteriser::ProcessCameraInput(int key, int action) {
     const float distance_step = 1.0f;  // Zoom speed
     const float pitch_step = 0.03f;    // Vertical rotation speed
 
+    // Calculate forward and right vectors based on current orbit angle
+    glm::vec3 forward(cos(orbit_angle_), sin(orbit_angle_), 0.0f);
+    glm::vec3 right(sin(orbit_angle_), -cos(orbit_angle_), 0.0f);
+
     switch (key) {
-        case GLFW_KEY_D:
+        // Rotation controls (Arrow keys)
         case GLFW_KEY_RIGHT:
             orbit_angle_ -= angle_step;  // Rotate right (clockwise)
             break;
-        case GLFW_KEY_A:
         case GLFW_KEY_LEFT:
             orbit_angle_ += angle_step;  // Rotate left (counter-clockwise)
             break;
-        case GLFW_KEY_W:
         case GLFW_KEY_UP:
             orbit_pitch_ += pitch_step;  // Look up
-            orbit_pitch_ = std::min(orbit_pitch_, 1.4f);  // Clamp to ~80 degrees
+            orbit_pitch_ = std::min(orbit_pitch_, 1.4f);
             break;
-        case GLFW_KEY_S:
         case GLFW_KEY_DOWN:
             orbit_pitch_ -= pitch_step;  // Look down
-            orbit_pitch_ = std::max(orbit_pitch_, -0.2f);  // Clamp to ~-10 degrees
+            orbit_pitch_ = std::max(orbit_pitch_, -0.2f);
             break;
+
+        // Movement controls (WASD) - move the camera target point
+        case GLFW_KEY_W:
+            orbit_target_ += forward * move_speed_;  // Move forward
+            break;
+        case GLFW_KEY_S:
+            orbit_target_ -= forward * move_speed_;  // Move backward
+            break;
+        case GLFW_KEY_A:
+            orbit_target_ -= right * move_speed_;    // Move left
+            break;
+        case GLFW_KEY_D:
+            orbit_target_ += right * move_speed_;    // Move right
+            break;
+
+        // Zoom controls
         case GLFW_KEY_Q:
             orbit_distance_ -= distance_step;  // Zoom in
-            orbit_distance_ = std::max(orbit_distance_, 5.0f);  // Minimum distance
+            orbit_distance_ = std::max(orbit_distance_, 1.0f);  // Can get very close
             break;
         case GLFW_KEY_E:
             orbit_distance_ += distance_step;  // Zoom out
-            orbit_distance_ = std::min(orbit_distance_, 100.0f);  // Maximum distance
+            orbit_distance_ = std::min(orbit_distance_, 100.0f);
+            break;
+
+        // Vertical movement
+        case GLFW_KEY_R:
+            orbit_target_.z += move_speed_;  // Move up
+            break;
+        case GLFW_KEY_F:
+            orbit_target_.z -= move_speed_;  // Move down
             break;
     }
 

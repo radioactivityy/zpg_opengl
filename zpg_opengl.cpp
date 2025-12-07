@@ -10,6 +10,7 @@
 
 #include "tutorials.h"
 #include "Rasteriser.h"
+#include "Collider.h"
 
 int main()
 {
@@ -20,9 +21,9 @@ int main()
         // Load shader program
         rasteriser.LoadProgram("phong.vert", "phong.frag");
 
-        // In your initialization or scene setup code:
-        rasteriser.AddCollisionFromOBJ("C:/Users/demirgul/Downloads/zpg_opengl_template/zpg_opengl_template/data/old_house/old_house_ground_collision.obj");
-        rasteriser.AddCollisionFromOBJ("C:/Users/demirgul/Downloads/zpg_opengl_template/zpg_opengl_template/data/old_house/old_house_ground_walls_collision.obj");
+        // Load collision meshes using PhysicsManager (relative paths)
+        PhysicsManager::Instance().CreateCollisionFromOBJ("../../data/old_house/old_house_ground_collision.obj");
+        PhysicsManager::Instance().CreateCollisionFromOBJ("../../data/old_house/old_house_ground_walls_collision.obj");
 
 
         // Optional: Load some entities to see in the scene
