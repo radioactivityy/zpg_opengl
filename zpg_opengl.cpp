@@ -18,31 +18,36 @@ int main()
         // Create the rasteriser (initializes everything)
         Rasteriser rasteriser;
 
-        // Load shader program
+        // Load shader programs
         rasteriser.LoadProgram("phong.vert", "phong.frag");
+        rasteriser.LoadGrassProgram("grass.vert", "phong.frag");  // Grass uses same frag shader
 
         // Load collision meshes using PhysicsManager (relative paths)
         PhysicsManager::Instance().CreateCollisionFromOBJ("../../data/old_house/old_house_ground_collision.obj");
         PhysicsManager::Instance().CreateCollisionFromOBJ("../../data/old_house/old_house_ground_walls_collision.obj");
 
-
-        // Optional: Load some entities to see in the scene
-        // Create a ground/floor entity
-
-        // Optional: Load your models
+        // Load house model
         auto house = rasteriser.CreateEntity("../../data/old_house/old_house.obj", "House");
-		
 
-        //// Table to the right
+        // Table to the right
         auto table = rasteriser.CreateEntity("../../data/tables/din_table.obj", "Table");
         auto& table_transform = rasteriser.GetRegistry().get<component::Transform>(table);
         table_transform.translation = glm::vec3(5, 0, 0);
         table_transform.update_model_matrix();
 
-        // Chest - just rotate, no translation
+        // Chest
         auto chest = rasteriser.CreateEntity("../../data/chest/chest.obj", "Chest");
         auto& chest_transform = rasteriser.GetRegistry().get<component::Transform>(chest);
         chest_transform.translation = glm::vec3(5, 0, 0);
+
+        // Grass - add with Grass component for special rendering
+        auto grass = rasteriser.CreateEntity("../../data/grass/grass.obj", "Grass");
+        rasteriser.GetRegistry().emplace<component::Grass>(grass);  // Tag as grass for special shader
+        auto& grass_transform = rasteriser.GetRegistry().get<component::Transform>(grass);
+        grass_transform.translation = glm::vec3(0, 0, 0);  // Position near house
+        grass_transform.scale = glm::vec3(1.0f);
+        grass_transform.update_model_matrix();
+
         // Start the main loop
         return rasteriser.Show();
     }

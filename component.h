@@ -56,4 +56,7 @@ namespace component {
             return parent != entt::null;
         }
     };
+
+    // Tag component for grass entities (use grass shader with wind animation)
+    struct Grass {};
 }

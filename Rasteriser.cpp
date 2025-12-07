@@ -392,6 +392,38 @@ int Rasteriser::LoadProgram(const std::string& vs_file_name, const std::string& 
     return 0;
 
 }
+
+int Rasteriser::LoadGrassProgram(const std::string& vs_file_name, const std::string& fs_file_name)
+{
+    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    std::vector<char> shader_source;
+    if (LoadShader(vs_file_name, shader_source) == S_OK)
+    {
+        const char* tmp = static_cast<const char*>(&shader_source[0]);
+        glShaderSource(vertex_shader, 1, &tmp, nullptr);
+        glCompileShader(vertex_shader);
+    }
+    CheckShader(vertex_shader);
+
+    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    if (LoadShader(fs_file_name, shader_source) == S_OK)
+    {
+        const char* tmp = static_cast<const char*>(&shader_source[0]);
+        glShaderSource(fragment_shader, 1, &tmp, nullptr);
+        glCompileShader(fragment_shader);
+    }
+    CheckShader(fragment_shader);
+
+    GLuint shader_program = glCreateProgram();
+    glAttachShader(shader_program, vertex_shader);
+    glAttachShader(shader_program, fragment_shader);
+    glLinkProgram(shader_program);
+    grass_shader_program_ = shader_program;
+
+    std::cout << "Grass shader program loaded: " << grass_shader_program_ << std::endl;
+    return 0;
+}
+
 //int Rasteriser::Show() {
 //    while (!glfwWindowShouldClose(_window))
 //    {
@@ -642,10 +674,9 @@ int Rasteriser::Show() {
         SetMatrix4x4(default_shader_program_, glm::value_ptr(P), "P");
         SetVector3(default_shader_program_, glm::value_ptr(camera_pos), "camera_pos_ws");
 
-        // Render entities
-        auto view = registry_.view<component::Transform, component::Mesh>();
-        for (auto [entity, transform, mesh_component] : view.each()) {
-
+        // ===== PASS 1: Render opaque objects (non-grass) =====
+        auto opaque_view = registry_.view<component::Transform, component::Mesh>(entt::exclude<component::Grass>);
+        for (auto [entity, transform, mesh_component] : opaque_view.each()) {
             glm::mat4 M = transform.get_world_matrix(registry_, entity);
             glm::mat3 Mn = glm::transpose(glm::inverse(glm::mat3(M)));
 
@@ -657,7 +688,49 @@ int Rasteriser::Show() {
                 glDrawElements(GL_TRIANGLES, glmesh.mesh->index_buffer_count(), GL_UNSIGNED_INT, 0);
             }
         }
-        
+
+        // ===== PASS 2: Render transparent objects (grass) with blending =====
+        if (grass_shader_program_ != 0) {
+            // Enable alpha blending
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+            // Disable face culling for grass (visible from both sides)
+            glDisable(GL_CULL_FACE);
+
+            // Use grass shader
+            glUseProgram(grass_shader_program_);
+
+            // Set uniforms for grass shader
+            SetMatrix4x4(grass_shader_program_, glm::value_ptr(V), "V");
+            SetMatrix4x4(grass_shader_program_, glm::value_ptr(P), "P");
+            SetVector3(grass_shader_program_, glm::value_ptr(light_ws), "light_ws");
+            SetVector3(grass_shader_program_, glm::value_ptr(light_color), "light_color");
+            SetVector3(grass_shader_program_, glm::value_ptr(ambient), "ambient_color");
+            SetVector3(grass_shader_program_, glm::value_ptr(camera_pos), "camera_pos_ws");
+
+            // Set time uniform for wind animation
+            SetFloat(grass_shader_program_, current_time, "time");
+
+            // Render grass entities
+            auto grass_view = registry_.view<component::Transform, component::Mesh, component::Grass>();
+            for (auto [entity, transform, mesh_component] : grass_view.each()) {
+                glm::mat4 M = transform.get_world_matrix(registry_, entity);
+                glm::mat3 Mn = glm::transpose(glm::inverse(glm::mat3(M)));
+
+                SetMatrix4x4(grass_shader_program_, glm::value_ptr(M), "M");
+                SetMatrix3x3(grass_shader_program_, glm::value_ptr(Mn), "Mn");
+
+                for (const auto& glmesh : mesh_component.gl_meshes) {
+                    glBindVertexArray(glmesh.vao);
+                    glDrawElements(GL_TRIANGLES, glmesh.mesh->index_buffer_count(), GL_UNSIGNED_INT, 0);
+                }
+            }
+
+            // Restore state
+            glDisable(GL_BLEND);
+            glEnable(GL_CULL_FACE);
+        }
 
         glfwSwapBuffers(_window);
         glfwPollEvents();
