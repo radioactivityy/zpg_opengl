@@ -53,19 +53,19 @@ void main(void)
     // Pixels with luminance below 0.2 become transparent, soft edge up to 0.4
     float alpha = smoothstep(0.15, 0.35, luminance);
 
-    // Discard fully transparent fragments
-    if (alpha < 0.1) {
-        discard;
-    }
+    // Discard fully transparent fragments (disabled for UV debug)
+    // if (alpha < 0.1) {
+    //     discard;
+    // }
 
-    // DEBUG: Output magenta if no texture, otherwise show texture color
-    vec3 result;
-    if (!has_texture) {
-        result = vec3(1.0, 0.0, 1.0);  // Magenta = no texture
-    } else {
-        result = diffuse_color * 1.2;  // Texture color
-    }
+    // DEBUG: Output UV coordinates as color to check mapping
+    // Red = U, Green = V
+    // If UV is correct, you should see gradient from black to red/green
+    vec3 result = vec3(tex_coord.x, tex_coord.y, 0.0);
 
-    // Output with alpha for transparency
-    FragColor = vec4(result, alpha);
+    // Comment out UV debug and show texture after verifying UVs work:
+    // result = diffuse_color * 1.2;
+
+    // Output with full alpha for debug visibility
+    FragColor = vec4(result, 1.0);
 }
