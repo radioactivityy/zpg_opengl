@@ -35,9 +35,12 @@ void main(void)
     // Get material from SSBO
     Material mat = materials[material_index];
 
+    // Debug: check if texture handle is valid
+    bool has_texture = (mat.tex_diffuse != uvec2(0));
+
     // Get diffuse color
     vec4 diffuse_rgba = vec4(mat.diffuse, 1.0);
-    if (mat.tex_diffuse != uvec2(0)) {
+    if (has_texture) {
         diffuse_rgba = texture(sampler2D(mat.tex_diffuse), tex_coord);
     }
     vec3 diffuse_color = diffuse_rgba.rgb;
@@ -55,9 +58,13 @@ void main(void)
         discard;
     }
 
-    // Simple grass rendering - just show the texture color directly
-    // No complex lighting to preserve the original green color
-    vec3 result = diffuse_color * 1.2;  // Slight brightness boost
+    // DEBUG: Output magenta if no texture, otherwise show texture color
+    vec3 result;
+    if (!has_texture) {
+        result = vec3(1.0, 0.0, 1.0);  // Magenta = no texture
+    } else {
+        result = diffuse_color * 1.2;  // Texture color
+    }
 
     // Output with alpha for transparency
     FragColor = vec4(result, alpha);
