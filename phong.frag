@@ -60,7 +60,8 @@ float CalculateShadow(vec4 pos_lcs, vec3 normal, vec3 light_dir)
     for (int y = -pcf_radius; y <= pcf_radius; ++y) {
         for (int x = -pcf_radius; x <= pcf_radius; ++x) {
             float depth = texture(shadow_map, proj_coords.xy + vec2(x, y) * texel_size).r;
-            shadow += (depth + bias >= proj_coords.z) ? 1.0 : 0.25;
+            // 1.0 if lit, 0.0 if in shadow (more contrast)
+            shadow += (depth + bias >= proj_coords.z) ? 1.0 : 0.0;
         }
     }
 

@@ -785,7 +785,7 @@ int Rasteriser::Show() {
         glm::vec3 light_color(1.8f, 1.8f, 1.7f);  // Bright warm sunlight
         SetVector3(default_shader_program_, glm::value_ptr(light_color), "light_color");
 
-        glm::vec3 ambient(0.5f, 0.5f, 0.55f);  // Strong ambient for good fill
+        glm::vec3 ambient(0.25f, 0.25f, 0.3f);  // Reduced ambient for visible shadows
         SetVector3(default_shader_program_, glm::value_ptr(ambient), "ambient_color");
 
         // Set camera uniforms
