@@ -9,6 +9,7 @@ in vec3 normal_ws;
 in vec3 tangent_ws;
 in vec3 bitangent_ws;
 in vec2 tex_coord;
+in vec4 position_lcs;  // Position in light clip space
 flat in int material_index;
 
 // Outputs
@@ -16,11 +17,11 @@ layout (location = 0) out vec4 FragColor;
 
 struct Material {
     vec3 diffuse;
-    uvec2 tex_diffuse;  
+    uvec2 tex_diffuse;
     vec3 rma;
-    uvec2 tex_rma;      
+    uvec2 tex_rma;
     vec3 normal;
-    uvec2 tex_normal;   
+    uvec2 tex_normal;
 };
 
 // SSBO for materials
@@ -33,6 +34,40 @@ uniform vec3 light_ws;
 uniform vec3 camera_pos_ws;
 uniform vec3 light_color;
 uniform vec3 ambient_color;
+uniform sampler2D shadow_map;  // Shadow depth map
+
+// Calculate shadow using PCF (Percentage Closer Filtering)
+float CalculateShadow(vec4 pos_lcs, vec3 normal, vec3 light_dir)
+{
+    // Perspective divide (convert from clip space to NDC)
+    vec3 proj_coords = pos_lcs.xyz / pos_lcs.w;
+
+    // Transform from NDC [-1,1] to texture coordinates [0,1]
+    proj_coords = proj_coords * 0.5 + 0.5;
+
+    // If outside light frustum, no shadow
+    if (proj_coords.z > 1.0)
+        return 1.0;
+
+    // Bias to prevent shadow acne (slope-scaled bias)
+    float bias = max(0.005 * (1.0 - dot(normal, light_dir)), 0.001);
+
+    // PCF: sample surrounding texels for softer shadows
+    float shadow = 0.0;
+    vec2 texel_size = 1.0 / textureSize(shadow_map, 0);
+    const int pcf_radius = 2;
+
+    for (int y = -pcf_radius; y <= pcf_radius; ++y) {
+        for (int x = -pcf_radius; x <= pcf_radius; ++x) {
+            float depth = texture(shadow_map, proj_coords.xy + vec2(x, y) * texel_size).r;
+            shadow += (depth + bias >= proj_coords.z) ? 1.0 : 0.25;
+        }
+    }
+
+    // Average the samples
+    float samples = (2 * pcf_radius + 1) * (2 * pcf_radius + 1);
+    return shadow / samples;
+}
 
 void main(void)
 {
@@ -97,8 +132,11 @@ void main(void)
     float distance = length(light_ws - position_ws);
     float attenuation = 1.0 / (1.0 + 0.0001 * distance);  // Much gentler falloff
 
-    // Final color
-    vec3 result = ambient + attenuation * (diffuse + specular);
+    // Calculate shadow
+    float shadow = CalculateShadow(position_lcs, N, L);
+
+    // Final color with shadow applied to direct lighting
+    vec3 result = ambient + attenuation * shadow * (diffuse + specular);
 
     // tone mapping
     result = result / (result + vec3(1.0));

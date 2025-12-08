@@ -26,6 +26,8 @@ public:
     int Show();
     int LoadProgram(const std::string& vs_file_name, const std::string& fs_file_name);
     int LoadGrassProgram(const std::string& vs_file_name, const std::string& fs_file_name);
+    int LoadShadowProgram(const std::string& vs_file_name, const std::string& fs_file_name);
+    void InitShadowDepthbuffer();
 private:
     std::vector<std::shared_ptr<TriangularMesh>> meshes_;
     entt::registry registry_;
@@ -39,6 +41,13 @@ private:
     GLuint materials_ssbo{ 0 };
     std::vector<GLMaterial> materials_;
     std::unique_ptr<Player> player_;
+
+    // Shadow mapping
+    int shadow_width_{ 2048 };  // shadow map resolution
+    int shadow_height_{ 2048 };
+    GLuint fbo_shadow_map_{ 0 };  // shadow mapping FBO
+    GLuint tex_shadow_map_{ 0 };  // shadow map texture
+    GLuint shadow_program_{ 0 };  // shadow mapping shaders
 
     // Camera orbit controls
     float orbit_angle_{ 0.0f };      // Horizontal angle around target (radians)

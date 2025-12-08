@@ -97,5 +97,11 @@
     <None Include="grass.frag">
       <Filter>Source Files\opengl</Filter>
     </None>
+    <None Include="shadow.vert">
+      <Filter>Source Files\opengl</Filter>
+    </None>
+    <None Include="shadow.frag">
+      <Filter>Source Files\opengl</Filter>
+    </None>
   </ItemGroup>
 </Project>

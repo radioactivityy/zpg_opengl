@@ -425,6 +425,79 @@ int Rasteriser::LoadGrassProgram(const std::string& vs_file_name, const std::str
     return 0;
 }
 
+int Rasteriser::LoadShadowProgram(const std::string& vs_file_name, const std::string& fs_file_name)
+{
+    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    std::vector<char> shader_source;
+    if (LoadShader(vs_file_name, shader_source) == S_OK)
+    {
+        const char* tmp = static_cast<const char*>(&shader_source[0]);
+        glShaderSource(vertex_shader, 1, &tmp, nullptr);
+        glCompileShader(vertex_shader);
+    }
+    CheckShader(vertex_shader);
+
+    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    if (LoadShader(fs_file_name, shader_source) == S_OK)
+    {
+        const char* tmp = static_cast<const char*>(&shader_source[0]);
+        glShaderSource(fragment_shader, 1, &tmp, nullptr);
+        glCompileShader(fragment_shader);
+    }
+    CheckShader(fragment_shader);
+
+    GLuint shader_program = glCreateProgram();
+    glAttachShader(shader_program, vertex_shader);
+    glAttachShader(shader_program, fragment_shader);
+    glLinkProgram(shader_program);
+    shadow_program_ = shader_program;
+
+    std::cout << "Shadow shader program loaded: " << shadow_program_ << std::endl;
+    return 0;
+}
+
+void Rasteriser::InitShadowDepthbuffer()
+{
+    // Create texture to hold depth values from light's perspective
+    glGenTextures(1, &tex_shadow_map_);
+    glBindTexture(GL_TEXTURE_2D, tex_shadow_map_);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, shadow_width_, shadow_height_,
+                 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+    // Areas outside the light's frustum will be lit (white border)
+    const float border_color[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Create framebuffer for shadow pass
+    glGenFramebuffers(1, &fbo_shadow_map_);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_shadow_map_);
+
+    // Attach texture as depth attachment
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex_shadow_map_, 0);
+
+    // We don't need color buffer for depth pass
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+
+    // Check framebuffer completeness
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cout << "ERROR: Shadow framebuffer is not complete!" << std::endl;
+    } else {
+        std::cout << "Shadow framebuffer initialized: " << shadow_width_ << "x" << shadow_height_ << std::endl;
+    }
+
+    // Bind default framebuffer back
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 //int Rasteriser::Show() {
 //    while (!glfwWindowShouldClose(_window))
 //    {
@@ -626,6 +699,26 @@ int Rasteriser::Show() {
         std::cout << "=========================\n" << std::endl;
         printed = true;
     }
+    // Light position and shadow mapping setup
+    glm::vec3 light_ws(30.0f, -30.0f, 60.0f);  // High above and to the side
+    glm::vec3 light_target(0.0f, 0.0f, 0.0f);  // Light looks at scene center
+    glm::vec3 light_up(0.0f, 0.0f, 1.0f);
+
+    // Light's view matrix (looking from light toward scene)
+    glm::mat4 V_light = glm::lookAt(light_ws, light_target, light_up);
+
+    // Orthographic projection for directional light shadow
+    float shadow_size = 40.0f;  // Size of the shadow frustum
+    glm::mat4 P_light = glm::ortho(-shadow_size, shadow_size, -shadow_size, shadow_size, 1.0f, 150.0f);
+
+    // Combined light-space projection matrix (P_light * V_light)
+    glm::mat4 light_space_matrix = P_light * V_light;
+
+    // Bind shadow map texture to texture unit 3 before entering the loop
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, tex_shadow_map_);
+    SetSampler(default_shader_program_, 3, "shadow_map");
+
     while (!glfwWindowShouldClose(_window))
     {
         static int frame = 0;
@@ -650,6 +743,33 @@ int Rasteriser::Show() {
             player_->Update(delta_time);
         }
 
+        // ===== SHADOW PASS: Render scene from light's perspective =====
+        if (shadow_program_ != 0) {
+            glUseProgram(shadow_program_);
+            glViewport(0, 0, shadow_width_, shadow_height_);
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo_shadow_map_);
+            glClear(GL_DEPTH_BUFFER_BIT);
+
+            // Render all opaque objects to shadow map
+            auto shadow_view = registry_.view<component::Transform, component::Mesh>(entt::exclude<component::Grass>);
+            for (auto [entity, transform, mesh_component] : shadow_view.each()) {
+                glm::mat4 M = transform.get_world_matrix(registry_, entity);
+                glm::mat4 mlp = light_space_matrix * M;  // Model-Light-Projection
+
+                SetMatrix4x4(shadow_program_, glm::value_ptr(mlp), "mlp");
+
+                for (const auto& glmesh : mesh_component.gl_meshes) {
+                    glBindVertexArray(glmesh.vao);
+                    glDrawElements(GL_TRIANGLES, glmesh.mesh->index_buffer_count(), GL_UNSIGNED_INT, 0);
+                }
+            }
+
+            // Reset to default framebuffer and viewport
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, width_, height_);
+        }
+
+        // ===== MAIN PASS: Render scene with shadows =====
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(default_shader_program_);
@@ -659,8 +779,7 @@ int Rasteriser::Show() {
         glm::mat4 P = camera_->GetProjectionMatrix();
         glm::vec3 camera_pos = camera_->GetPosition();
 
-        // Set lighting uniforms - sun-like directional light from above
-        glm::vec3 light_ws(30.0f, -30.0f, 60.0f);  // High above and to the side
+        // Set lighting uniforms
         SetVector3(default_shader_program_, glm::value_ptr(light_ws), "light_ws");
 
         glm::vec3 light_color(1.8f, 1.8f, 1.7f);  // Bright warm sunlight
@@ -669,13 +788,19 @@ int Rasteriser::Show() {
         glm::vec3 ambient(0.5f, 0.5f, 0.55f);  // Strong ambient for good fill
         SetVector3(default_shader_program_, glm::value_ptr(ambient), "ambient_color");
 
-
         // Set camera uniforms
         SetMatrix4x4(default_shader_program_, glm::value_ptr(V), "V");
         SetMatrix4x4(default_shader_program_, glm::value_ptr(P), "P");
         SetVector3(default_shader_program_, glm::value_ptr(camera_pos), "camera_pos_ws");
 
-        // ===== PASS 1: Render opaque objects (non-grass) =====
+        // Set light space matrix for shadow mapping
+        SetMatrix4x4(default_shader_program_, glm::value_ptr(light_space_matrix), "light_space_matrix");
+
+        // Bind shadow map
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, tex_shadow_map_);
+
+        // ===== Render opaque objects (non-grass) =====
         auto opaque_view = registry_.view<component::Transform, component::Mesh>(entt::exclude<component::Grass>);
         for (auto [entity, transform, mesh_component] : opaque_view.each()) {
             glm::mat4 M = transform.get_world_matrix(registry_, entity);
@@ -690,7 +815,7 @@ int Rasteriser::Show() {
             }
         }
 
-        // ===== PASS 2: Render transparent objects (grass) with blending =====
+        // ===== Render transparent objects (grass) with blending =====
         if (grass_shader_program_ != 0) {
             // Enable alpha blending
             glEnable(GL_BLEND);
@@ -712,6 +837,10 @@ int Rasteriser::Show() {
 
             // Set time uniform for wind animation
             SetFloat(grass_shader_program_, current_time, "time");
+
+            // Set shadow uniforms for grass
+            SetMatrix4x4(grass_shader_program_, glm::value_ptr(light_space_matrix), "light_space_matrix");
+            SetSampler(grass_shader_program_, 3, "shadow_map");
 
             // Render grass entities
             auto grass_view = registry_.view<component::Transform, component::Mesh, component::Grass>();
