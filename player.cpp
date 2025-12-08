@@ -26,25 +26,34 @@ void Player::Initialize(const glm::vec3& spawn_position) {
     position_ = spawn_position;
     velocity_ = glm::vec3(0.0f);
 
-    // Create character controller configuration
+    // Create character controller configuration with safer defaults
     CharacterControllerConfig config;
     config.position = spawn_position;
-    config.radius = 0.4f;           // Smaller radius to fit through doorways
-    config.height = 1.6f;           // Slightly shorter
-    config.step_offset = 0.3f;
+    config.radius = 0.3f;           // Smaller radius
+    config.height = 1.0f;           // Height of cylindrical part
+    config.step_offset = 0.2f;      // Must be < height + radius
     config.slope_limit = 45.0f;
-    config.contact_offset = 0.1f;   // Larger contact offset for better wall detection
+    config.contact_offset = 0.1f;
     config.max_jump_height = 2.0f;
+
+    // Use default climbing mode and non-walkable mode
+    config.climbing_mode = PxCapsuleClimbingMode::eEASY;
+    config.non_walkable_mode = PxControllerNonWalkableMode::ePREVENT_CLIMBING_AND_FORCE_SLIDING;
+
+    // Safer density and scale values
+    config.density = 10.0f;
+    config.scale_coeff = 0.9f;
+    config.volume_growth = 1.5f;
 
     // Create controller
     controller_ = PhysicsManager::Instance().CreateCapsuleController(config);
 
     if (!controller_) {
-        std::cerr << "Failed to create player controller!" << std::endl;
-        // Continue without physics for now
+        std::cerr << "Failed to create player controller! Player will move without physics." << std::endl;
     }
     else {
-        std::cout << "Player controller created successfully!" << std::endl;
+        std::cout << "Player controller created successfully at ("
+            << spawn_position.x << ", " << spawn_position.y << ", " << spawn_position.z << ")" << std::endl;
     }
 
     UpdateCamera();

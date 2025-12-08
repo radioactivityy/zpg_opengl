@@ -88,8 +88,9 @@ Rasteriser::Rasteriser() {
     // The player should fall if they walk off the house's ground collision
 
   // Enable first-person player controller
+  // Spawn in front of house (Y = -8), slightly above ground (Z = 3) so player falls
   player_ = std::make_unique<Player>(camera_.get());
-  player_->Initialize(glm::vec3(0, -15, 1));  // Start outside, south of the house
+  player_->Initialize(glm::vec3(0, -8, 3));  // In front of house, above ground
   player_->SetInitialYaw(90.0f);  // Face north toward the house (0,0,0)
 }
 
