@@ -26,7 +26,7 @@ layout(std430, binding = 0) readonly buffer Materials {
     Material materials[];
 };
 
-// Uniform variables (only what we need for grass)
+// Uniform variables
 uniform vec3 light_ws;
 uniform vec3 camera_pos_ws;
 
@@ -35,9 +35,32 @@ void main(void)
     // Get material from SSBO
     Material mat = materials[material_index];
 
-    // Sample texture directly - output raw color
-    vec4 texColor = texture(sampler2D(mat.tex_diffuse), tex_coord);
+    // Sample grass texture
+    vec4 texColor = vec4(mat.diffuse, 1.0);
+    if (mat.tex_diffuse != uvec2(0)) {
+        texColor = texture(sampler2D(mat.tex_diffuse), tex_coord);
+    }
 
-    // Output raw texture color (should show green grass on dark background)
-    FragColor = vec4(texColor.rgb, 1.0);
+    // Calculate alpha from luminance - dark pixels become transparent
+    float luminance = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
+    float alpha = smoothstep(0.1, 0.4, luminance);
+
+    // Discard fully transparent pixels
+    if (alpha < 0.1) {
+        discard;
+    }
+
+    // Simple lighting
+    vec3 N = normalize(normal_ws);
+    vec3 L = normalize(light_ws - position_ws);
+    float NdotL = max(dot(N, L), 0.0);
+
+    // Grass color with simple ambient + diffuse lighting
+    vec3 grassColor = texColor.rgb * (0.5 + 0.5 * NdotL);
+
+    // Boost saturation slightly for more vibrant grass
+    float gray = dot(grassColor, vec3(0.299, 0.587, 0.114));
+    grassColor = mix(vec3(gray), grassColor, 1.3);
+
+    FragColor = vec4(grassColor, alpha);
 }
