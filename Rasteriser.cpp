@@ -425,7 +425,7 @@ int Rasteriser::LoadGrassProgram(const std::string& vs_file_name, const std::str
     return 0;
 }
 
-int Rasteriser::LoadShadowProgram(const std::string& vs_file_name, const std::string& fs_file_name)
+int Rasteriser::LoadSkyboxProgram(const std::string& vs_file_name, const std::string& fs_file_name)
 {
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
     std::vector<char> shader_source;
@@ -450,52 +450,38 @@ int Rasteriser::LoadShadowProgram(const std::string& vs_file_name, const std::st
     glAttachShader(shader_program, vertex_shader);
     glAttachShader(shader_program, fragment_shader);
     glLinkProgram(shader_program);
-    shadow_program_ = shader_program;
+    skybox_shader_program_ = shader_program;
 
-    std::cout << "Shadow shader program loaded: " << shadow_program_ << std::endl;
+    // Create VAO for fullscreen triangle (uses gl_VertexID, no actual vertex data needed)
+    glGenVertexArrays(1, &skybox_vao_);
+
+    std::cout << "Skybox shader program loaded: " << skybox_shader_program_ << std::endl;
     return 0;
 }
 
-void Rasteriser::InitShadowDepthbuffer()
+void Rasteriser::LoadSkyboxTexture(const std::string& texture_path)
 {
-    // Create texture to hold depth values from light's perspective
-    glGenTextures(1, &tex_shadow_map_);
-    glBindTexture(GL_TEXTURE_2D, tex_shadow_map_);
+    // Load the texture using FreeImage through the Texture class
+    Texture texture = Texture3u(texture_path);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, shadow_width_, shadow_height_,
-                 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-
-    // Areas outside the light's frustum will be lit (white border)
-    const float border_color[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color);
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    // Create framebuffer for shadow pass
-    glGenFramebuffers(1, &fbo_shadow_map_);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo_shadow_map_);
-
-    // Attach texture as depth attachment
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex_shadow_map_, 0);
-
-    // We don't need color buffer for depth pass
-    glDrawBuffer(GL_NONE);
-    glReadBuffer(GL_NONE);
-
-    // Check framebuffer completeness
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        std::cout << "ERROR: Shadow framebuffer is not complete!" << std::endl;
-    } else {
-        std::cout << "Shadow framebuffer initialized: " << shadow_width_ << "x" << shadow_height_ << std::endl;
+    if (texture.width() == 0 || texture.height() == 0) {
+        std::cout << "ERROR: Failed to load skybox texture from: " << texture_path << std::endl;
+        return;
     }
 
-    // Bind default framebuffer back
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    std::cout << "Loading skybox texture: " << texture_path << std::endl;
+    std::cout << "  Dimensions: " << texture.width() << "x" << texture.height() << std::endl;
+
+    // Create bindless texture for skybox
+    CreateBindlessTexture(skybox_texture_, skybox_texture_handle_,
+        texture.width(), texture.height(), texture.data(), 0);
+
+    if (skybox_texture_handle_ != 0) {
+        std::cout << "Skybox texture loaded successfully, handle: " << skybox_texture_handle_ << std::endl;
+    }
+    else {
+        std::cout << "ERROR: Failed to create skybox texture handle!" << std::endl;
+    }
 }
 
 //int Rasteriser::Show() {
@@ -772,14 +758,46 @@ int Rasteriser::Show() {
         // ===== MAIN PASS: Render scene with shadows =====
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glUseProgram(default_shader_program_);
 
         // Get matrices from camera (now controlled by player)
         glm::mat4 V = camera_->GetViewMatrix();
         glm::mat4 P = camera_->GetProjectionMatrix();
         glm::vec3 camera_pos = camera_->GetPosition();
 
-        // Set lighting uniforms
+        // ===== PASS 0: Render skybox (environment background) =====
+        if (skybox_shader_program_ != 0 && skybox_texture_handle_ != 0) {
+            // Disable depth writing (skybox is always at infinity)
+            glDepthMask(GL_FALSE);
+            glDisable(GL_CULL_FACE);
+
+            glUseProgram(skybox_shader_program_);
+
+            // Calculate inverse VP matrix for ray direction computation
+            glm::mat4 VP = P * V;
+            glm::mat4 inv_VP = glm::inverse(VP);
+            SetMatrix4x4(skybox_shader_program_, glm::value_ptr(inv_VP), "inv_VP");
+
+            // Set skybox texture handle
+            GLint loc = glGetUniformLocation(skybox_shader_program_, "skybox_texture");
+            if (loc != -1) {
+                glUniform2ui(loc,
+                    static_cast<GLuint>(skybox_texture_handle_ & 0xFFFFFFFF),
+                    static_cast<GLuint>(skybox_texture_handle_ >> 32));
+            }
+
+            // Draw fullscreen triangle
+            glBindVertexArray(skybox_vao_);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+
+            // Restore state
+            glDepthMask(GL_TRUE);
+            glEnable(GL_CULL_FACE);
+        }
+
+        glUseProgram(default_shader_program_);
+
+        // Set lighting uniforms - sun-like directional light from above
+        glm::vec3 light_ws(30.0f, -30.0f, 60.0f);  // High above and to the side
         SetVector3(default_shader_program_, glm::value_ptr(light_ws), "light_ws");
 
         glm::vec3 light_color(1.8f, 1.8f, 1.7f);  // Bright warm sunlight

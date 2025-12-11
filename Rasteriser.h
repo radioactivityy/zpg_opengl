@@ -26,8 +26,8 @@ public:
     int Show();
     int LoadProgram(const std::string& vs_file_name, const std::string& fs_file_name);
     int LoadGrassProgram(const std::string& vs_file_name, const std::string& fs_file_name);
-    int LoadShadowProgram(const std::string& vs_file_name, const std::string& fs_file_name);
-    void InitShadowDepthbuffer();
+    int LoadSkyboxProgram(const std::string& vs_file_name, const std::string& fs_file_name);
+    void LoadSkyboxTexture(const std::string& texture_path);
 private:
     std::vector<std::shared_ptr<TriangularMesh>> meshes_;
     entt::registry registry_;
@@ -38,6 +38,10 @@ private:
     std::unique_ptr<Camera> camera_;
     GLuint default_shader_program_{ 0 };
     GLuint grass_shader_program_{ 0 };  // Grass shader with wind animation
+    GLuint skybox_shader_program_{ 0 };  // Skybox/environment shader
+    GLuint skybox_vao_{ 0 };  // VAO for fullscreen triangle
+    GLuint skybox_texture_{ 0 };  // Skybox texture
+    GLuint64 skybox_texture_handle_{ 0 };  // Bindless texture handle
     GLuint materials_ssbo{ 0 };
     std::vector<GLMaterial> materials_;
     std::unique_ptr<Player> player_;
