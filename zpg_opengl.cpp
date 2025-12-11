@@ -24,13 +24,9 @@ int main()
         rasteriser.LoadSkyboxProgram("skybox.vert", "skybox.frag");  // Environmental mapping shader
 
         // Load skybox/environment texture (equirectangular panorama)
-        // Note: Place your background image at data/skybox/background.png (relative to project root)
-        // Or at ../../data/skybox/background.png (relative to build output folder)
-        // Supported formats: PNG, JPG, BMP, TGA (AVIF format needs conversion first)
-        // Try both paths - one from project root, one from build folder
-        rasteriser.LoadSkyboxTexture("data/skybox/background.png");
-        // If the above fails, try the build-relative path:
-        // rasteriser.LoadSkyboxTexture("../../data/skybox/background.png");
+        // Path: ../../data/skybox/background.png (relative to build output folder x64/Debug/)
+        // Supported formats: PNG, JPG, BMP, TGA
+        rasteriser.LoadSkyboxTexture("../../data/skybox/background.png");
 
         // Load collision meshes using PhysicsManager (relative paths)
         PhysicsManager::Instance().CreateCollisionFromOBJ("../../data/old_house/old_house_ground_collision.obj");
