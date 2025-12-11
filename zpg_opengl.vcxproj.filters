@@ -100,5 +100,20 @@
     <None Include="skybox.frag">
       <Filter>Source Files\opengl</Filter>
     </None>
+    <None Include="grass.frag">
+      <Filter>Source Files\opengl</Filter>
+    </None>
+    <None Include="shadow.vert">
+      <Filter>Source Files\opengl</Filter>
+    </None>
+    <None Include="shadow.frag">
+      <Filter>Source Files\opengl</Filter>
+    </None>
+    <None Include="rain.vert">
+      <Filter>Source Files\opengl</Filter>
+    </None>
+    <None Include="rain.frag">
+      <Filter>Source Files\opengl</Filter>
+    </None>
   </ItemGroup>
 </Project>

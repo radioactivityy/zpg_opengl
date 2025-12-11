@@ -25,17 +25,19 @@ int main()
 
         // Load shader programs
         rasteriser.LoadProgram("phong.vert", "phong.frag");
-        rasteriser.LoadGrassProgram("grass.vert", "phong.frag");  // Grass uses same frag shader
-        rasteriser.LoadSkyboxProgram("skybox.vert", "skybox.frag");  // Environmental mapping shader
+        rasteriser.LoadGrassProgram("grass.vert", "grass.frag");
+        rasteriser.LoadSkyboxProgram("skybox.vert", "skybox.frag");
+        rasteriser.LoadShadowProgram("shadow.vert", "shadow.frag");
+        rasteriser.LoadRainProgram("rain.vert", "rain.frag");
 
-        // Load skybox/environment texture (equirectangular panorama)
-        // Note: Place your background image at data/skybox/background.png (relative to project root)
-        // Or at ../../data/skybox/background.png (relative to build output folder)
-        // Supported formats: PNG, JPG, BMP, TGA (AVIF format needs conversion first)
-        // Try both paths - one from project root, one from build folder
-        rasteriser.LoadSkyboxTexture("data/skybox/background.png");
-        // If the above fails, try the build-relative path:
-        // rasteriser.LoadSkyboxTexture("../../data/skybox/background.png");
+        // Initialize shadow mapping
+        rasteriser.InitShadowDepthbuffer();
+
+        // Initialize rain particle system
+        rasteriser.InitRainParticles();
+
+        // Load skybox/environment texture
+        rasteriser.LoadSkyboxTexture("../../data/skybox/background.png");
 
         // Load collision meshes using PhysicsManager (relative paths)
         PhysicsManager::Instance().CreateCollisionFromOBJ("../../data/old_house/old_house_ground_collision.obj");

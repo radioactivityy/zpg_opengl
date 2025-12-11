@@ -484,6 +484,108 @@ void Rasteriser::LoadSkyboxTexture(const std::string& texture_path)
     }
 }
 
+int Rasteriser::LoadRainProgram(const std::string& vs_file_name, const std::string& fs_file_name)
+{
+    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    std::vector<char> shader_source;
+    if (LoadShader(vs_file_name, shader_source) == S_OK)
+    {
+        const char* tmp = static_cast<const char*>(&shader_source[0]);
+        glShaderSource(vertex_shader, 1, &tmp, nullptr);
+        glCompileShader(vertex_shader);
+    }
+    CheckShader(vertex_shader);
+
+    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    if (LoadShader(fs_file_name, shader_source) == S_OK)
+    {
+        const char* tmp = static_cast<const char*>(&shader_source[0]);
+        glShaderSource(fragment_shader, 1, &tmp, nullptr);
+        glCompileShader(fragment_shader);
+    }
+    CheckShader(fragment_shader);
+
+    GLuint shader_program = glCreateProgram();
+    glAttachShader(shader_program, vertex_shader);
+    glAttachShader(shader_program, fragment_shader);
+    glLinkProgram(shader_program);
+    rain_shader_program_ = shader_program;
+
+    std::cout << "Rain shader program loaded: " << rain_shader_program_ << std::endl;
+    return 0;
+}
+
+void Rasteriser::InitRainParticles()
+{
+    rain_particles_.resize(RAIN_PARTICLE_COUNT);
+
+    // Initialize particles with random positions around the camera
+    for (int i = 0; i < RAIN_PARTICLE_COUNT; ++i) {
+        rain_particles_[i].position = glm::vec3(
+            (rand() % 1000 - 500) / 10.0f,  // -50 to 50
+            (rand() % 1000 - 500) / 10.0f,  // -50 to 50
+            (rand() % 500) / 10.0f + 1.0f   // 1 to 51 (above ground)
+        );
+        rain_particles_[i].life = (rand() % 100) / 100.0f;
+        rain_particles_[i].velocity = glm::vec3(
+            (rand() % 100 - 50) / 500.0f,   // Slight horizontal drift
+            (rand() % 100 - 50) / 500.0f,
+            -8.0f - (rand() % 40) / 10.0f   // Fall speed -8 to -12
+        );
+        rain_particles_[i].padding = 0.0f;
+    }
+
+    // Create VAO and VBO for rain particles
+    glGenVertexArrays(1, &rain_vao_);
+    glGenBuffers(1, &rain_vbo_);
+
+    glBindVertexArray(rain_vao_);
+    glBindBuffer(GL_ARRAY_BUFFER, rain_vbo_);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(RainParticle) * RAIN_PARTICLE_COUNT, rain_particles_.data(), GL_DYNAMIC_DRAW);
+
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(RainParticle), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Life attribute
+    glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(RainParticle), (void*)offsetof(RainParticle, life));
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
+
+    std::cout << "Rain particle system initialized with " << RAIN_PARTICLE_COUNT << " particles" << std::endl;
+}
+
+void Rasteriser::UpdateRainParticles(float delta_time, const glm::vec3& camera_pos)
+{
+    for (int i = 0; i < RAIN_PARTICLE_COUNT; ++i) {
+        // Update position
+        rain_particles_[i].position += rain_particles_[i].velocity * delta_time;
+
+        // Update life
+        rain_particles_[i].life -= delta_time * 0.5f;
+
+        // Respawn dead or out-of-bounds particles near camera
+        if (rain_particles_[i].life <= 0.0f || rain_particles_[i].position.z < -5.0f) {
+            rain_particles_[i].position = camera_pos + glm::vec3(
+                (rand() % 600 - 300) / 10.0f,  // -30 to 30 from camera
+                (rand() % 600 - 300) / 10.0f,
+                20.0f + (rand() % 200) / 10.0f  // 20 to 40 above camera
+            );
+            rain_particles_[i].life = 1.0f;
+            rain_particles_[i].velocity = glm::vec3(
+                (rand() % 100 - 50) / 500.0f,
+                (rand() % 100 - 50) / 500.0f,
+                -8.0f - (rand() % 40) / 10.0f
+            );
+        }
+    }
+
+    // Update VBO
+    glBindBuffer(GL_ARRAY_BUFFER, rain_vbo_);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(RainParticle) * RAIN_PARTICLE_COUNT, rain_particles_.data());
+}
+
 //int Rasteriser::Show() {
 //    while (!glfwWindowShouldClose(_window))
 //    {
@@ -890,6 +992,39 @@ int Rasteriser::Show() {
             // Restore state
             glDisable(GL_BLEND);
             glEnable(GL_CULL_FACE);
+        }
+
+        // ===== Render rain particles =====
+        if (rain_shader_program_ != 0 && rain_vao_ != 0) {
+            // Update rain particles
+            UpdateRainParticles(delta_time, camera_pos);
+
+            // Enable blending for transparent rain
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+            // Disable depth writing but keep depth testing
+            glDepthMask(GL_FALSE);
+
+            // Enable point sprites
+            glEnable(GL_PROGRAM_POINT_SIZE);
+
+            glUseProgram(rain_shader_program_);
+
+            // Set uniforms
+            glm::mat4 VP = P * V;
+            SetMatrix4x4(rain_shader_program_, glm::value_ptr(VP), "VP");
+            SetVector3(rain_shader_program_, glm::value_ptr(camera_pos), "camera_pos");
+            SetFloat(rain_shader_program_, current_time, "time");
+
+            // Draw rain particles as points
+            glBindVertexArray(rain_vao_);
+            glDrawArrays(GL_POINTS, 0, RAIN_PARTICLE_COUNT);
+
+            // Restore state
+            glDisable(GL_PROGRAM_POINT_SIZE);
+            glDepthMask(GL_TRUE);
+            glDisable(GL_BLEND);
         }
 
         glfwSwapBuffers(_window);
