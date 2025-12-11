@@ -425,6 +425,79 @@ int Rasteriser::LoadGrassProgram(const std::string& vs_file_name, const std::str
     return 0;
 }
 
+int Rasteriser::LoadShadowProgram(const std::string& vs_file_name, const std::string& fs_file_name)
+{
+    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    std::vector<char> shader_source;
+    if (LoadShader(vs_file_name, shader_source) == S_OK)
+    {
+        const char* tmp = static_cast<const char*>(&shader_source[0]);
+        glShaderSource(vertex_shader, 1, &tmp, nullptr);
+        glCompileShader(vertex_shader);
+    }
+    CheckShader(vertex_shader);
+
+    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    if (LoadShader(fs_file_name, shader_source) == S_OK)
+    {
+        const char* tmp = static_cast<const char*>(&shader_source[0]);
+        glShaderSource(fragment_shader, 1, &tmp, nullptr);
+        glCompileShader(fragment_shader);
+    }
+    CheckShader(fragment_shader);
+
+    GLuint shader_program = glCreateProgram();
+    glAttachShader(shader_program, vertex_shader);
+    glAttachShader(shader_program, fragment_shader);
+    glLinkProgram(shader_program);
+    shadow_program_ = shader_program;
+
+    std::cout << "Shadow shader program loaded: " << shadow_program_ << std::endl;
+    return 0;
+}
+
+void Rasteriser::InitShadowDepthbuffer()
+{
+    // Create texture to hold depth values from light's perspective
+    glGenTextures(1, &tex_shadow_map_);
+    glBindTexture(GL_TEXTURE_2D, tex_shadow_map_);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, shadow_width_, shadow_height_,
+                 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+    // Areas outside the light's frustum will be lit (white border)
+    const float border_color[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Create framebuffer for shadow pass
+    glGenFramebuffers(1, &fbo_shadow_map_);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_shadow_map_);
+
+    // Attach texture as depth attachment
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex_shadow_map_, 0);
+
+    // We don't need color buffer for depth pass
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+
+    // Check framebuffer completeness
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cout << "ERROR: Shadow framebuffer is not complete!" << std::endl;
+    } else {
+        std::cout << "Shadow framebuffer initialized: " << shadow_width_ << "x" << shadow_height_ << std::endl;
+    }
+
+    // Bind default framebuffer back
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 int Rasteriser::LoadSkyboxProgram(const std::string& vs_file_name, const std::string& fs_file_name)
 {
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
