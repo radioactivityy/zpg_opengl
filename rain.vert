@@ -26,7 +26,7 @@ void main()
 
     // Point size based on distance (closer = larger)
     float dist = length(pos - camera_pos);
-    gl_PointSize = clamp(50.0 / dist, 1.0, 4.0);
+    gl_PointSize = clamp(100.0 / dist, 2.0, 8.0);
 
     depth = clip_pos.z / clip_pos.w;
 }

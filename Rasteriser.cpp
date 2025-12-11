@@ -951,9 +951,10 @@ int Rasteriser::Show() {
         glm::vec3 camera_pos = camera_->GetPosition();
 
         // ===== PASS 0: Render skybox (environment background) =====
-        if (skybox_shader_program_ != 0 && skybox_texture_handle_ != 0) {
+        if (skybox_shader_program_ != 0) {
             // Disable depth writing (skybox is always at infinity)
             glDepthMask(GL_FALSE);
+            glDepthFunc(GL_LEQUAL);  // Render at far plane
             glDisable(GL_CULL_FACE);
 
             glUseProgram(skybox_shader_program_);
@@ -963,7 +964,7 @@ int Rasteriser::Show() {
             glm::mat4 inv_VP = glm::inverse(VP);
             SetMatrix4x4(skybox_shader_program_, glm::value_ptr(inv_VP), "inv_VP");
 
-            // Set skybox texture handle
+            // Set skybox texture handle (0 if no texture - shader has fallback)
             GLint loc = glGetUniformLocation(skybox_shader_program_, "skybox_texture");
             if (loc != -1) {
                 glUniform2ui(loc,
@@ -971,11 +972,12 @@ int Rasteriser::Show() {
                     static_cast<GLuint>(skybox_texture_handle_ >> 32));
             }
 
-            // Draw fullscreen triangle
+            // Draw fullscreen triangle (uses gl_VertexID in shader)
             glBindVertexArray(skybox_vao_);
             glDrawArrays(GL_TRIANGLES, 0, 3);
 
             // Restore state
+            glDepthFunc(GL_LESS);
             glDepthMask(GL_TRUE);
             glEnable(GL_CULL_FACE);
         }
