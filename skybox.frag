@@ -1,45 +1,43 @@
 #version 460 core
 #extension GL_ARB_bindless_texture : require
 
-// Input from vertex shader
 in vec2 tex_coord;
-
-// Output
 layout (location = 0) out vec4 FragColor;
 
-// Uniforms
-uniform mat4 inv_VP;  // Inverse of View-Projection matrix
-uniform uvec2 skybox_texture;  // Bindless texture handle
+uniform mat4 inv_VP;
+uniform uvec2 skybox_texture;
 
-// Constants
 const float PI = 3.14159265359;
 
 void main()
 {
     // Convert screen coordinates to world-space ray direction
-    // NDC coordinates
     vec4 ndc = vec4(tex_coord * 2.0 - 1.0, 1.0, 1.0);
-
-    // Transform to world space
     vec4 world_pos = inv_VP * ndc;
     vec3 ray_dir = normalize(world_pos.xyz / world_pos.w);
 
-    // Convert ray direction to equirectangular UV coordinates
-    // Spherical coordinates: theta (azimuth), phi (elevation)
-    float theta = atan(ray_dir.y, ray_dir.x);  // -PI to PI
-    float phi = asin(clamp(ray_dir.z, -1.0, 1.0));  // -PI/2 to PI/2
+    // Cylindrical projection for 180-degree horizontal FOV
+    // Only use horizontal angle (yaw), keep vertical natural
+    float yaw = atan(ray_dir.y, ray_dir.x);  // -PI to PI
 
-    // Convert to UV (0-1 range)
-    vec2 uv;
-    uv.x = (theta + PI) / (2.0 * PI);  // 0 to 1
-    uv.y = (phi + PI / 2.0) / PI;       // 0 to 1
+    // Map yaw to U coordinate (180 degrees = full image width)
+    float u = (yaw / PI) * 0.5 + 0.5;  // 0 to 1 for 180 degrees
 
-    // Sample the skybox texture
-    vec4 sky_color = vec4(0.3, 0.5, 0.8, 1.0);  // Default sky blue
+    // For V, use gentle pitch mapping for natural horizon look
+    float pitch = asin(clamp(ray_dir.z, -1.0, 1.0));
+    float v = (pitch / (PI * 0.5)) * 0.5 + 0.5;  // 0 to 1
+
+    // Clamp to valid range
+    u = clamp(u, 0.0, 1.0);
+    v = clamp(v, 0.0, 1.0);
+
+    vec2 uv = vec2(u, v);
+
+    // Sample skybox texture
+    vec4 sky_color = vec4(0.4, 0.6, 0.9, 1.0);  // Default sky blue
     if (skybox_texture != uvec2(0)) {
         sky_color = texture(sampler2D(skybox_texture), uv);
     }
 
-    // Output the sky color
     FragColor = sky_color;
 }
