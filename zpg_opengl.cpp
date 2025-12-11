@@ -37,17 +37,19 @@ int main()
 
         // Load house model
         auto house = rasteriser.CreateEntity("../../data/old_house/old_house.obj", "House");
+        auto& house_transform = rasteriser.GetRegistry().get<component::Transform>(house);
+        house_transform.translation = glm::vec3(0,0, 0);
 
         // Table to the right
         auto table = rasteriser.CreateEntity("../../data/tables/din_table.obj", "Table");
         auto& table_transform = rasteriser.GetRegistry().get<component::Transform>(table);
-        table_transform.translation = glm::vec3(5, 0, 0);
+        table_transform.translation = glm::vec3(3,3, 0);
         table_transform.update_model_matrix();
 
         // Chest
         auto chest = rasteriser.CreateEntity("../../data/chest/chest.obj", "Chest");
         auto& chest_transform = rasteriser.GetRegistry().get<component::Transform>(chest);
-        chest_transform.translation = glm::vec3(5, 0, 0);
+        chest_transform.translation = glm::vec3(5,0, 0);
 
         // Grass - create dense grass field around the house
         // Generate grass positions in a grid with some randomness

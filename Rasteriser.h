@@ -32,8 +32,8 @@ private:
     std::vector<std::shared_ptr<TriangularMesh>> meshes_;
     entt::registry registry_;
     std::unique_ptr<MeshLoader> _mesh_loader;
-    int width_{ 480 };
-    int height_{ 480 };
+    int width_{ 800 };
+    int height_{ 800 };
     GLFWwindow* _window;
     std::unique_ptr<Camera> camera_;
     GLuint default_shader_program_{ 0 };
