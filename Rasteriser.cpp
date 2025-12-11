@@ -424,6 +424,65 @@ int Rasteriser::LoadGrassProgram(const std::string& vs_file_name, const std::str
     return 0;
 }
 
+int Rasteriser::LoadSkyboxProgram(const std::string& vs_file_name, const std::string& fs_file_name)
+{
+    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    std::vector<char> shader_source;
+    if (LoadShader(vs_file_name, shader_source) == S_OK)
+    {
+        const char* tmp = static_cast<const char*>(&shader_source[0]);
+        glShaderSource(vertex_shader, 1, &tmp, nullptr);
+        glCompileShader(vertex_shader);
+    }
+    CheckShader(vertex_shader);
+
+    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    if (LoadShader(fs_file_name, shader_source) == S_OK)
+    {
+        const char* tmp = static_cast<const char*>(&shader_source[0]);
+        glShaderSource(fragment_shader, 1, &tmp, nullptr);
+        glCompileShader(fragment_shader);
+    }
+    CheckShader(fragment_shader);
+
+    GLuint shader_program = glCreateProgram();
+    glAttachShader(shader_program, vertex_shader);
+    glAttachShader(shader_program, fragment_shader);
+    glLinkProgram(shader_program);
+    skybox_shader_program_ = shader_program;
+
+    // Create VAO for fullscreen triangle (uses gl_VertexID, no actual vertex data needed)
+    glGenVertexArrays(1, &skybox_vao_);
+
+    std::cout << "Skybox shader program loaded: " << skybox_shader_program_ << std::endl;
+    return 0;
+}
+
+void Rasteriser::LoadSkyboxTexture(const std::string& texture_path)
+{
+    // Load the texture using FreeImage through the Texture class
+    Texture texture = Texture3u(texture_path);
+
+    if (texture.width() == 0 || texture.height() == 0) {
+        std::cout << "ERROR: Failed to load skybox texture from: " << texture_path << std::endl;
+        return;
+    }
+
+    std::cout << "Loading skybox texture: " << texture_path << std::endl;
+    std::cout << "  Dimensions: " << texture.width() << "x" << texture.height() << std::endl;
+
+    // Create bindless texture for skybox
+    CreateBindlessTexture(skybox_texture_, skybox_texture_handle_,
+        texture.width(), texture.height(), texture.data(), 0);
+
+    if (skybox_texture_handle_ != 0) {
+        std::cout << "Skybox texture loaded successfully, handle: " << skybox_texture_handle_ << std::endl;
+    }
+    else {
+        std::cout << "ERROR: Failed to create skybox texture handle!" << std::endl;
+    }
+}
+
 //int Rasteriser::Show() {
 //    while (!glfwWindowShouldClose(_window))
 //    {
@@ -651,12 +710,43 @@ int Rasteriser::Show() {
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glUseProgram(default_shader_program_);
 
         // Get matrices from camera (now controlled by player)
         glm::mat4 V = camera_->GetViewMatrix();
         glm::mat4 P = camera_->GetProjectionMatrix();
         glm::vec3 camera_pos = camera_->GetPosition();
+
+        // ===== PASS 0: Render skybox (environment background) =====
+        if (skybox_shader_program_ != 0 && skybox_texture_handle_ != 0) {
+            // Disable depth writing (skybox is always at infinity)
+            glDepthMask(GL_FALSE);
+            glDisable(GL_CULL_FACE);
+
+            glUseProgram(skybox_shader_program_);
+
+            // Calculate inverse VP matrix for ray direction computation
+            glm::mat4 VP = P * V;
+            glm::mat4 inv_VP = glm::inverse(VP);
+            SetMatrix4x4(skybox_shader_program_, glm::value_ptr(inv_VP), "inv_VP");
+
+            // Set skybox texture handle
+            GLint loc = glGetUniformLocation(skybox_shader_program_, "skybox_texture");
+            if (loc != -1) {
+                glUniform2ui(loc,
+                    static_cast<GLuint>(skybox_texture_handle_ & 0xFFFFFFFF),
+                    static_cast<GLuint>(skybox_texture_handle_ >> 32));
+            }
+
+            // Draw fullscreen triangle
+            glBindVertexArray(skybox_vao_);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+
+            // Restore state
+            glDepthMask(GL_TRUE);
+            glEnable(GL_CULL_FACE);
+        }
+
+        glUseProgram(default_shader_program_);
 
         // Set lighting uniforms - sun-like directional light from above
         glm::vec3 light_ws(30.0f, -30.0f, 60.0f);  // High above and to the side
