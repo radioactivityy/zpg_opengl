@@ -27,9 +27,14 @@ int main()
         rasteriser.LoadProgram("phong.vert", "phong.frag");
         rasteriser.LoadGrassProgram("grass.vert", "grass.frag");  // Grass shader with luminance-based alpha
         rasteriser.LoadShadowProgram("shadow.vert", "shadow.frag");  // Shadow mapping shaders
+        rasteriser.LoadSkyboxProgram("skybox.vert", "skybox.frag");  // Environmental background shader
 
         // Initialize shadow mapping
         rasteriser.InitShadowDepthbuffer();
+
+        // Load skybox/environment background texture
+        // Path: ../../data/skybox/background.png (relative to build output folder x64/Debug/)
+        rasteriser.LoadSkyboxTexture("../../data/skybox/background.png");
 
         // Load collision meshes using PhysicsManager (relative paths)
         PhysicsManager::Instance().CreateCollisionFromOBJ("../../data/old_house/old_house_ground_collision.obj");
