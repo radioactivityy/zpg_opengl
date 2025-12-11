@@ -25,8 +25,9 @@ void main()
     gl_Position = clip_pos;
 
     // Point size based on distance (closer = larger)
-    float dist = length(pos - camera_pos);
-    gl_PointSize = clamp(100.0 / dist, 2.0, 8.0);
+     float dist = max(length(pos - camera_pos), 1.0); 
+    float twinkle = 0.85 + 0.25 * sin(time * 12.0 + pos.x + pos.y); 
+    gl_PointSize = clamp((80.0 / dist) * twinkle, 1.5, 4.5);
 
     depth = clip_pos.z / clip_pos.w;
 }

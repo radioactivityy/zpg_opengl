@@ -61,7 +61,7 @@ private:
     GLuint rain_shader_program_{ 0 };
     GLuint rain_vao_{ 0 };
     GLuint rain_vbo_{ 0 };
-    static const int RAIN_PARTICLE_COUNT = 5000;
+    static const int RAIN_PARTICLE_COUNT = 15000;
     struct RainParticle {
         glm::vec3 position;
         float life;

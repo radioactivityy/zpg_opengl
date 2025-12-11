@@ -603,7 +603,7 @@ void Rasteriser::InitRainParticles()
         rain_particles_[i].velocity = glm::vec3(
             (rand() % 100 - 50) / 500.0f,   // Slight horizontal drift
             (rand() % 100 - 50) / 500.0f,
-            -8.0f - (rand() % 40) / 10.0f   // Fall speed -8 to -12
+            -14.0f - (rand() % 80) / 10.0f  // Fall speed -8 to -12
         );
         rain_particles_[i].padding = 0.0f;
     }
@@ -636,20 +636,20 @@ void Rasteriser::UpdateRainParticles(float delta_time, const glm::vec3& camera_p
         rain_particles_[i].position += rain_particles_[i].velocity * delta_time;
 
         // Update life
-        rain_particles_[i].life -= delta_time * 0.5f;
+        rain_particles_[i].life -= delta_time * 0.7f;
 
         // Respawn dead or out-of-bounds particles near camera
         if (rain_particles_[i].life <= 0.0f || rain_particles_[i].position.z < -5.0f) {
             rain_particles_[i].position = camera_pos + glm::vec3(
                 (rand() % 600 - 300) / 10.0f,  // -30 to 30 from camera
                 (rand() % 600 - 300) / 10.0f,
-                20.0f + (rand() % 200) / 10.0f  // 20 to 40 above camera
+                20.0f + (rand() % 300) / 10.0f  // 20 to 40 above camera
             );
             rain_particles_[i].life = 1.0f;
             rain_particles_[i].velocity = glm::vec3(
                 (rand() % 100 - 50) / 500.0f,
                 (rand() % 100 - 50) / 500.0f,
-                -8.0f - (rand() % 40) / 10.0f
+                -14.0f - (rand() % 80) / 10.0f
             );
         }
     }

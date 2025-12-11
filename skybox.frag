@@ -32,7 +32,7 @@ void main()
     // Convert to UV (0-1 range)
     vec2 uv;
     uv.x = (theta + PI) / (2.0 * PI);  // 0 to 1
-    uv.y = (phi + PI / 2.0) / PI;       // 0 to 1
+    uv.y = 1.0 - ((phi + PI / 2.0) / PI);       // 0 to 1
 
     // Sample the skybox texture
     vec4 sky_color = vec4(0.3, 0.5, 0.8, 1.0);  // Default sky blue
