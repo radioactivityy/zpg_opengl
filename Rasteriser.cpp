@@ -736,6 +736,13 @@ int Rasteriser::Show() {
             glBindFramebuffer(GL_FRAMEBUFFER, fbo_shadow_map_);
             glClear(GL_DEPTH_BUFFER_BIT);
 
+            // Disable culling for shadow pass to render all geometry
+            glDisable(GL_CULL_FACE);
+
+            // Use polygon offset to help with shadow acne
+            glEnable(GL_POLYGON_OFFSET_FILL);
+            glPolygonOffset(2.0f, 4.0f);
+
             // Render all opaque objects to shadow map
             auto shadow_view = registry_.view<component::Transform, component::Mesh>(entt::exclude<component::Grass>);
             for (auto [entity, transform, mesh_component] : shadow_view.each()) {
@@ -749,6 +756,10 @@ int Rasteriser::Show() {
                     glDrawElements(GL_TRIANGLES, glmesh.mesh->index_buffer_count(), GL_UNSIGNED_INT, 0);
                 }
             }
+
+            // Restore state
+            glDisable(GL_POLYGON_OFFSET_FILL);
+            glEnable(GL_CULL_FACE);
 
             // Reset to default framebuffer and viewport
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
