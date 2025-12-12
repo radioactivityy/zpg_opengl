@@ -37,7 +37,7 @@ int main()
         rasteriser.InitRainParticles();
 
         // Load skybox/environment texture
-        rasteriser.LoadSkyboxTexture("../../data/skybox/background.jpg");
+        rasteriser.LoadSkyboxTexture("../../data/skybox/background.bmp");
 
         // Load collision meshes using PhysicsManager (relative paths)
         PhysicsManager::Instance().CreateCollisionFromOBJ("../../data/old_house/old_house_ground_collision.obj");
