@@ -11,9 +11,6 @@ layout (location = 0) out vec4 FragColor;
 uniform mat4 inv_VP;  // Inverse of View-Projection matrix
 uniform uvec2 skybox_texture;  // Bindless texture handle
 
-// Constants
-const float PI = 3.14159265359;
-
 void main()
 {
     // Convert screen coordinates to world-space ray direction
@@ -21,22 +18,24 @@ void main()
     vec4 world_pos = inv_VP * ndc;
     vec3 ray_dir = normalize(world_pos.xyz / world_pos.w);
 
-    // Map ray direction to UV coordinates for panoramic image
-    // Horizontal: based on XY angle (azimuth)
-    float theta = atan(ray_dir.y, ray_dir.x);
-    // Vertical: based on Z (elevation) - clamp to reasonable range
-    float elevation = ray_dir.z;
+    // Simple UV mapping for background image
+    // Map the ray direction to UV coordinates
+    // Horizontal: based on XY angle, Vertical: based on Z
+    float u = 0.5 + atan(ray_dir.x, ray_dir.y) / 6.28318;  // 0 to 1
+    float v = 0.5 - asin(clamp(ray_dir.z, -1.0, 1.0)) / 3.14159;  // 0 to 1
 
-    // UV mapping for panoramic background
-    vec2 uv;
-    uv.x = (theta + PI) / (2.0 * PI);  // 0 to 1 horizontal wrap
-    // Map elevation (-1 to 1) to vertical UV, with sky at top
-    uv.y = 1.0 - (elevation * 0.5 + 0.5);  // Flip so sky is at top of image
+    vec2 uv = vec2(u, v);
 
-    // Sample the skybox texture
-    vec4 sky_color = vec4(0.4, 0.6, 0.9, 1.0);  // Default sky blue
+    // Sample the texture
+    vec4 sky_color;
     if (skybox_texture != uvec2(0)) {
         sky_color = texture(sampler2D(skybox_texture), uv);
+    } else {
+        // Fallback gradient: blue sky to warm horizon
+        float t = ray_dir.z * 0.5 + 0.5;
+        vec3 horizon = vec3(0.9, 0.7, 0.5);
+        vec3 zenith = vec3(0.3, 0.5, 0.9);
+        sky_color = vec4(mix(horizon, zenith, t), 1.0);
     }
 
     FragColor = sky_color;
