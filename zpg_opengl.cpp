@@ -36,9 +36,8 @@ int main()
         // Initialize rain particle system
         rasteriser.InitRainParticles();
 
-        // Load skybox/environment texture (try different extensions)
+        // Load skybox/environment texture
         rasteriser.LoadSkyboxTexture("../../data/skybox/background.jpg");
-        // If .png fails, the shader will use default blue sky color
 
         // Load collision meshes using PhysicsManager (relative paths)
         PhysicsManager::Instance().CreateCollisionFromOBJ("../../data/old_house/old_house_ground_collision.obj");

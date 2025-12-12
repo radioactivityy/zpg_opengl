@@ -546,16 +546,30 @@ void Rasteriser::LoadSkyboxTexture(const std::string& texture_path)
     std::cout << "Loading skybox texture: " << texture_path << std::endl;
     std::cout << "  Dimensions: " << texture.width() << "x" << texture.height() << std::endl;
 
-    // Create bindless texture for skybox
-    CreateBindlessTexture(skybox_texture_, skybox_texture_handle_,
-        texture.width(), texture.height(), texture.data(), 0);
+    // Create OpenGL texture directly for skybox (with BGR->RGB swap)
+    glGenTextures(1, &skybox_texture_);
+    glBindTexture(GL_TEXTURE_2D, skybox_texture_);
 
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // FreeImage loads as BGR, OpenGL expects RGB - use GL_BGR
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, texture.width(), texture.height(),
+                 0, GL_BGR, GL_UNSIGNED_BYTE, texture.data());
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    // Create bindless handle
+    skybox_texture_handle_ = glGetTextureHandleARB(skybox_texture_);
     if (skybox_texture_handle_ != 0) {
+        glMakeTextureHandleResidentARB(skybox_texture_handle_);
         std::cout << "Skybox texture loaded successfully, handle: " << skybox_texture_handle_ << std::endl;
-    }
-    else {
+    } else {
         std::cout << "ERROR: Failed to create skybox texture handle!" << std::endl;
     }
+
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 int Rasteriser::LoadRainProgram(const std::string& vs_file_name, const std::string& fs_file_name)
@@ -636,11 +650,12 @@ void Rasteriser::UpdateRainParticles(float delta_time, const glm::vec3& camera_p
         // Update position
         rain_particles_[i].position += rain_particles_[i].velocity * delta_time;
 
-        // Update life
-        rain_particles_[i].life -= delta_time * 0.7f;
+        // Update life - moderate decay
+        rain_particles_[i].life -= delta_time * 0.5f;
 
         // Respawn dead or out-of-bounds particles near camera
-        if (rain_particles_[i].life <= 0.0f || rain_particles_[i].position.z < -5.0f) {
+        if (rain_particles_[i].life <= 0.0f || rain_particles_[i].position.z < -2.0f) {
+            // Spawn rain in a cylinder around the camera
             rain_particles_[i].position = camera_pos + glm::vec3(
                 (rand() % 600 - 300) / 10.0f,  // -30 to 30 from camera
                 (rand() % 600 - 300) / 10.0f,
@@ -650,7 +665,7 @@ void Rasteriser::UpdateRainParticles(float delta_time, const glm::vec3& camera_p
             rain_particles_[i].velocity = glm::vec3(
                 (rand() % 100 - 50) / 500.0f,
                 (rand() % 100 - 50) / 500.0f,
-                -14.0f - (rand() % 80) / 10.0f
+                -14.0f - (rand() % 80) / 10.0f  // Fall speed -14 to -22
             );
         }
     }

@@ -10,16 +10,23 @@ void main()
     // Discard dead particles
     if (life <= 0.0) discard;
 
-   vec3 rain_color = vec3( 1.0);
+    // Rain drop color - bright white
+    vec3 rain_color = vec3(1.0);
 
-    // Simple circular point with soft edges
+    // Create elongated vertical streak (rain drop shape)
     vec2 coord = gl_PointCoord * 2.0 - 1.0;
-    float dist = length(coord);
 
+    // Stretch vertically to make rain streaks
+    float streak_x = abs(coord.x) * 3.0;  // Narrow horizontally
+    float streak_y = abs(coord.y) * 0.3;  // Stretch vertically
 
-    float alpha = smoothstep(1.0, 0.0, dist) * life * 0.9 ; 
+    // Combined distance for elongated shape
+    float dist = streak_x * streak_x + streak_y * streak_y;
 
-    if (alpha < 0.05) discard;
+    // Soft falloff for streak
+    float alpha = exp(-dist * 2.0) * life * 0.9;
+
+    if (alpha < 0.1) discard;
 
     FragColor = vec4(rain_color, alpha);
 }

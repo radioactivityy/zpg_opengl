@@ -24,10 +24,10 @@ void main()
     vec4 clip_pos = VP * vec4(pos, 1.0);
     gl_Position = clip_pos;
 
-    // Point size based on distance (closer = larger)
-     float dist = max(length(pos - camera_pos), 1.0); 
-    float twinkle = 0.85 + 0.25 * sin(time * 12.0 + pos.x + pos.y); 
-    gl_PointSize = clamp((80.0 / dist) * twinkle, 1.5, 4.5);
+    // Point size based on distance with twinkle effect for rain streaks
+    float dist = max(length(pos - camera_pos), 1.0);
+    float twinkle = 0.85 + 0.25 * sin(time * 12.0 + pos.x + pos.y);
+    gl_PointSize = clamp((120.0 / dist) * twinkle, 3.0, 12.0);
 
     depth = clip_pos.z / clip_pos.w;
 }
