@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <cmath>
 #include <algorithm>
+# include <vector> 
 
 void Rasteriser::AddCollisionFromOBJ(const std::string& obj_path, const glm::vec3& position) {
     // Only allow the two specific files
@@ -942,7 +943,7 @@ int Rasteriser::Show() {
         }
 
         // ===== MAIN PASS: Render scene with shadows =====
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClearColor(0.2f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Get matrices from camera (now controlled by player)

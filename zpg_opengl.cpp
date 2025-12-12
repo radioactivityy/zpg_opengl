@@ -68,7 +68,7 @@ int main()
         for (float x = -12; x <= 12; x += 1.5f) {
             for (float y = -10; y <= 14; y += 1.5f) {
                 // Skip areas inside/under the house (approximate house footprint)
-                if (x > -5 && x < 8 && y > -2 && y < 8) continue;
+                if (x > -7 && x < 9 && y > -2 && y < 9) continue;
 
                 // Add some randomness to position
                 float rx = (rand() % 100) / 100.0f - 0.5f;

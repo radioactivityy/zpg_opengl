@@ -39,6 +39,9 @@ void main(void)
     vec4 texColor = vec4(mat.diffuse, 1.0);
     if (mat.tex_diffuse != uvec2(0)) {
         texColor = texture(sampler2D(mat.tex_diffuse), tex_coord);
+    }  else { 
+        // Ensure a natural base color when no texture is bound 
+        texColor = vec4(0.18, 0.55, 0.24, 1.0);
     }
 
     // Calculate alpha from luminance - dark pixels become transparent
@@ -50,17 +53,19 @@ void main(void)
         discard;
     }
 
-    // Simple lighting
-    vec3 N = normalize(normal_ws);
-    vec3 L = normalize(light_ws - position_ws);
-    float NdotL = max(dot(N, L), 0.0);
+    // Simple lighting 
+    vec3 N = normalize(normal_ws); 
+    vec3 L = normalize(light_ws - position_ws); 
+    float NdotL = max(dot(N, L), 0.0); 
 
-    // Grass color with simple ambient + diffuse lighting
-    vec3 grassColor = texColor.rgb * (0.5 + 0.5 * NdotL);
+    // Grass color with simple ambient + diffuse lighting 
+    vec3 grassColor = texColor.rgb * (0.5 + 0.5 * NdotL); 
+    // Apply a gentle green tint to ensure the grass reads as green even with flat textures 
+    vec3 tintedBase = texColor.rgb * vec3(0.9, 1.05, 0.9); 
+    vec3 litGrass = tintedBase * (0.5 + 0.5 * NdotL); 
 
-    // Boost saturation slightly for more vibrant grass
-    float gray = dot(grassColor, vec3(0.299, 0.587, 0.114));
-    grassColor = mix(vec3(gray), grassColor, 1.3);
+     float gray = dot( litGrass , vec3(0.299, 0.587, 0.114)); 
+    vec3 finalGrass = mix(vec3(gray), litGrass , 1.3); 
 
-    FragColor = vec4(grassColor, alpha);
+    FragColor = vec4( finalGrass , alpha);
 }
