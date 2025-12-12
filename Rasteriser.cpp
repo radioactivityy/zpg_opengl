@@ -535,18 +535,27 @@ int Rasteriser::LoadSkyboxProgram(const std::string& vs_file_name, const std::st
 
 void Rasteriser::LoadSkyboxTexture(const std::string& texture_path)
 {
+    std::cout << "Attempting to load skybox texture: " << texture_path << std::endl;
+
+    // Try to check if file exists
+    std::filesystem::path fs_path(texture_path);
+    std::cout << "  Absolute path: " << std::filesystem::absolute(fs_path) << std::endl;
+    std::cout << "  File exists: " << std::filesystem::exists(fs_path) << std::endl;
+
     // Load the texture using FreeImage through the Texture class
     Texture texture = Texture3u(texture_path);
 
     if (texture.width() == 0 || texture.height() == 0) {
         std::cout << "ERROR: Failed to load skybox texture from: " << texture_path << std::endl;
+        std::cout << "  Make sure the file exists at the correct relative path." << std::endl;
         return;
     }
 
     std::cout << "Loading skybox texture: " << texture_path << std::endl;
     std::cout << "  Dimensions: " << texture.width() << "x" << texture.height() << std::endl;
+    std::cout << "  Data pointer: " << (void*)texture.data() << std::endl;
 
-    // Create OpenGL texture directly for skybox (with BGR->RGB swap)
+    // Create OpenGL texture directly for skybox
     glGenTextures(1, &skybox_texture_);
     glBindTexture(GL_TEXTURE_2D, skybox_texture_);
 
@@ -560,11 +569,14 @@ void Rasteriser::LoadSkyboxTexture(const std::string& texture_path)
                  0, GL_BGR, GL_UNSIGNED_BYTE, texture.data());
     glGenerateMipmap(GL_TEXTURE_2D);
 
+    std::cout << "  OpenGL texture ID: " << skybox_texture_ << std::endl;
+
     // Create bindless handle
     skybox_texture_handle_ = glGetTextureHandleARB(skybox_texture_);
     if (skybox_texture_handle_ != 0) {
         glMakeTextureHandleResidentARB(skybox_texture_handle_);
-        std::cout << "Skybox texture loaded successfully, handle: " << skybox_texture_handle_ << std::endl;
+        std::cout << "Skybox texture loaded successfully!" << std::endl;
+        std::cout << "  Bindless handle: " << skybox_texture_handle_ << std::endl;
     } else {
         std::cout << "ERROR: Failed to create skybox texture handle!" << std::endl;
     }
