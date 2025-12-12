@@ -27,13 +27,17 @@ public:
     int LoadProgram(const std::string& vs_file_name, const std::string& fs_file_name);
     int LoadGrassProgram(const std::string& vs_file_name, const std::string& fs_file_name);
     int LoadSkyboxProgram(const std::string& vs_file_name, const std::string& fs_file_name);
+    int LoadRainProgram(const std::string& vs_file_name, const std::string& fs_file_name);
+    int LoadShadowProgram(const std::string& vs_file_name, const std::string& fs_file_name);
     void LoadSkyboxTexture(const std::string& texture_path);
+    void InitShadowDepthbuffer();
+    void InitRainParticles();
 private:
     std::vector<std::shared_ptr<TriangularMesh>> meshes_;
     entt::registry registry_;
     std::unique_ptr<MeshLoader> _mesh_loader;
-    int width_{ 480 };
-    int height_{ 480 };
+    int width_{ 800 };
+    int height_{ 800 };
     GLFWwindow* _window;
     std::unique_ptr<Camera> camera_;
     GLuint default_shader_program_{ 0 };
@@ -45,6 +49,27 @@ private:
     GLuint materials_ssbo{ 0 };
     std::vector<GLMaterial> materials_;
     std::unique_ptr<Player> player_;
+
+    // Shadow mapping
+    int shadow_width_{ 2048 };  // shadow map resolution
+    int shadow_height_{ 2048 };
+    GLuint fbo_shadow_map_{ 0 };  // shadow mapping FBO
+    GLuint tex_shadow_map_{ 0 };  // shadow map texture
+    GLuint shadow_program_{ 0 };  // shadow mapping shaders
+
+    // Rain particle system
+    GLuint rain_shader_program_{ 0 };
+    GLuint rain_vao_{ 0 };
+    GLuint rain_vbo_{ 0 };
+    static const int RAIN_PARTICLE_COUNT = 15000;
+    struct RainParticle {
+        glm::vec3 position;
+        float life;
+        glm::vec3 velocity;
+        float padding;
+    };
+    std::vector<RainParticle> rain_particles_;
+    void UpdateRainParticles(float delta_time, const glm::vec3& camera_pos);
 
     // Camera orbit controls
     float orbit_angle_{ 0.0f };      // Horizontal angle around target (radians)

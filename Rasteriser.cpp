@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <cmath>
 #include <algorithm>
+# include <vector> 
 
 void Rasteriser::AddCollisionFromOBJ(const std::string& obj_path, const glm::vec3& position) {
     // Only allow the two specific files
@@ -88,8 +89,9 @@ Rasteriser::Rasteriser() {
     // The player should fall if they walk off the house's ground collision
 
   // Enable first-person player controller
+  // Spawn in front of house (Y = -8), slightly above ground (Z = 3) so player falls
   player_ = std::make_unique<Player>(camera_.get());
-  player_->Initialize(glm::vec3(0, -15, 1));  // Start outside, south of the house
+  player_->Initialize(glm::vec3(0, -8, 3));  // In front of house, above ground
   player_->SetInitialYaw(90.0f);  // Face north toward the house (0,0,0)
 }
 
@@ -424,6 +426,79 @@ int Rasteriser::LoadGrassProgram(const std::string& vs_file_name, const std::str
     return 0;
 }
 
+int Rasteriser::LoadShadowProgram(const std::string& vs_file_name, const std::string& fs_file_name)
+{
+    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    std::vector<char> shader_source;
+    if (LoadShader(vs_file_name, shader_source) == S_OK)
+    {
+        const char* tmp = static_cast<const char*>(&shader_source[0]);
+        glShaderSource(vertex_shader, 1, &tmp, nullptr);
+        glCompileShader(vertex_shader);
+    }
+    CheckShader(vertex_shader);
+
+    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    if (LoadShader(fs_file_name, shader_source) == S_OK)
+    {
+        const char* tmp = static_cast<const char*>(&shader_source[0]);
+        glShaderSource(fragment_shader, 1, &tmp, nullptr);
+        glCompileShader(fragment_shader);
+    }
+    CheckShader(fragment_shader);
+
+    GLuint shader_program = glCreateProgram();
+    glAttachShader(shader_program, vertex_shader);
+    glAttachShader(shader_program, fragment_shader);
+    glLinkProgram(shader_program);
+    shadow_program_ = shader_program;
+
+    std::cout << "Shadow shader program loaded: " << shadow_program_ << std::endl;
+    return 0;
+}
+
+void Rasteriser::InitShadowDepthbuffer()
+{
+    // Create texture to hold depth values from light's perspective
+    glGenTextures(1, &tex_shadow_map_);
+    glBindTexture(GL_TEXTURE_2D, tex_shadow_map_);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, shadow_width_, shadow_height_,
+                 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+    // Areas outside the light's frustum will be lit (white border)
+    const float border_color[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Create framebuffer for shadow pass
+    glGenFramebuffers(1, &fbo_shadow_map_);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_shadow_map_);
+
+    // Attach texture as depth attachment
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex_shadow_map_, 0);
+
+    // We don't need color buffer for depth pass
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+
+    // Check framebuffer completeness
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cout << "ERROR: Shadow framebuffer is not complete!" << std::endl;
+    } else {
+        std::cout << "Shadow framebuffer initialized: " << shadow_width_ << "x" << shadow_height_ << std::endl;
+    }
+
+    // Bind default framebuffer back
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 int Rasteriser::LoadSkyboxProgram(const std::string& vs_file_name, const std::string& fs_file_name)
 {
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
@@ -471,16 +546,133 @@ void Rasteriser::LoadSkyboxTexture(const std::string& texture_path)
     std::cout << "Loading skybox texture: " << texture_path << std::endl;
     std::cout << "  Dimensions: " << texture.width() << "x" << texture.height() << std::endl;
 
-    // Create bindless texture for skybox
-    CreateBindlessTexture(skybox_texture_, skybox_texture_handle_,
-        texture.width(), texture.height(), texture.data(), 0);
+    // Create OpenGL texture directly for skybox (with BGR->RGB swap)
+    glGenTextures(1, &skybox_texture_);
+    glBindTexture(GL_TEXTURE_2D, skybox_texture_);
 
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // FreeImage loads as BGR, OpenGL expects RGB - use GL_BGR
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8, texture.width(), texture.height(),
+                 0, GL_BGR, GL_UNSIGNED_BYTE, texture.data());
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    // Create bindless handle
+    skybox_texture_handle_ = glGetTextureHandleARB(skybox_texture_);
     if (skybox_texture_handle_ != 0) {
+        glMakeTextureHandleResidentARB(skybox_texture_handle_);
         std::cout << "Skybox texture loaded successfully, handle: " << skybox_texture_handle_ << std::endl;
-    }
-    else {
+    } else {
         std::cout << "ERROR: Failed to create skybox texture handle!" << std::endl;
     }
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+int Rasteriser::LoadRainProgram(const std::string& vs_file_name, const std::string& fs_file_name)
+{
+    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    std::vector<char> shader_source;
+    if (LoadShader(vs_file_name, shader_source) == S_OK)
+    {
+        const char* tmp = static_cast<const char*>(&shader_source[0]);
+        glShaderSource(vertex_shader, 1, &tmp, nullptr);
+        glCompileShader(vertex_shader);
+    }
+    CheckShader(vertex_shader);
+
+    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    if (LoadShader(fs_file_name, shader_source) == S_OK)
+    {
+        const char* tmp = static_cast<const char*>(&shader_source[0]);
+        glShaderSource(fragment_shader, 1, &tmp, nullptr);
+        glCompileShader(fragment_shader);
+    }
+    CheckShader(fragment_shader);
+
+    GLuint shader_program = glCreateProgram();
+    glAttachShader(shader_program, vertex_shader);
+    glAttachShader(shader_program, fragment_shader);
+    glLinkProgram(shader_program);
+    rain_shader_program_ = shader_program;
+
+    std::cout << "Rain shader program loaded: " << rain_shader_program_ << std::endl;
+    return 0;
+}
+
+void Rasteriser::InitRainParticles()
+{
+    rain_particles_.resize(RAIN_PARTICLE_COUNT);
+
+    // Initialize particles with random positions around the camera
+    for (int i = 0; i < RAIN_PARTICLE_COUNT; ++i) {
+        rain_particles_[i].position = glm::vec3(
+            (rand() % 1000 - 500) / 10.0f,  // -50 to 50
+            (rand() % 1000 - 500) / 10.0f,  // -50 to 50
+            (rand() % 500) / 10.0f + 1.0f   // 1 to 51 (above ground)
+        );
+        rain_particles_[i].life = (rand() % 100) / 100.0f;
+        rain_particles_[i].velocity = glm::vec3(
+            (rand() % 100 - 50) / 500.0f,   // Slight horizontal drift
+            (rand() % 100 - 50) / 500.0f,
+            -14.0f - (rand() % 80) / 10.0f  // Fall speed -8 to -12
+        );
+        rain_particles_[i].padding = 0.0f;
+    }
+
+    // Create VAO and VBO for rain particles
+    glGenVertexArrays(1, &rain_vao_);
+    glGenBuffers(1, &rain_vbo_);
+
+    glBindVertexArray(rain_vao_);
+    glBindBuffer(GL_ARRAY_BUFFER, rain_vbo_);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(RainParticle) * RAIN_PARTICLE_COUNT, rain_particles_.data(), GL_DYNAMIC_DRAW);
+
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(RainParticle), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    // Life attribute
+    glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(RainParticle), (void*)offsetof(RainParticle, life));
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
+
+    std::cout << "Rain particle system initialized with " << RAIN_PARTICLE_COUNT << " particles" << std::endl;
+}
+
+void Rasteriser::UpdateRainParticles(float delta_time, const glm::vec3& camera_pos)
+{
+    for (int i = 0; i < RAIN_PARTICLE_COUNT; ++i) {
+        // Update position
+        rain_particles_[i].position += rain_particles_[i].velocity * delta_time;
+
+        // Update life - moderate decay
+        rain_particles_[i].life -= delta_time * 0.5f;
+
+        // Respawn dead or out-of-bounds particles near camera
+        if (rain_particles_[i].life <= 0.0f || rain_particles_[i].position.z < -2.0f) {
+            // Spawn rain in a cylinder around the camera
+            rain_particles_[i].position = camera_pos + glm::vec3(
+                (rand() % 600 - 300) / 10.0f,  // -30 to 30 from camera
+                (rand() % 600 - 300) / 10.0f,
+                20.0f + (rand() % 300) / 10.0f  // 20 to 40 above camera
+            );
+            rain_particles_[i].life = 1.0f;
+            rain_particles_[i].velocity = glm::vec3(
+                (rand() % 100 - 50) / 500.0f,
+                (rand() % 100 - 50) / 500.0f,
+                -14.0f - (rand() % 80) / 10.0f  // Fall speed -14 to -22
+            );
+        }
+    }
+
+    // Update VBO
+    glBindBuffer(GL_ARRAY_BUFFER, rain_vbo_);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(RainParticle) * RAIN_PARTICLE_COUNT, rain_particles_.data());
 }
 
 //int Rasteriser::Show() {
@@ -684,6 +876,26 @@ int Rasteriser::Show() {
         std::cout << "=========================\n" << std::endl;
         printed = true;
     }
+    // Light position and shadow mapping setup
+    glm::vec3 light_ws(30.0f, -30.0f, 60.0f);  // High above and to the side
+    glm::vec3 light_target(0.0f, 0.0f, 0.0f);  // Light looks at scene center
+    glm::vec3 light_up(0.0f, 0.0f, 1.0f);
+
+    // Light's view matrix (looking from light toward scene)
+    glm::mat4 V_light = glm::lookAt(light_ws, light_target, light_up);
+
+    // Orthographic projection for directional light shadow
+    float shadow_size = 40.0f;  // Size of the shadow frustum
+    glm::mat4 P_light = glm::ortho(-shadow_size, shadow_size, -shadow_size, shadow_size, 1.0f, 150.0f);
+
+    // Combined light-space projection matrix (P_light * V_light)
+    glm::mat4 light_space_matrix = P_light * V_light;
+
+    // Bind shadow map texture to texture unit 3 before entering the loop
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, tex_shadow_map_);
+    SetSampler(default_shader_program_, 3, "shadow_map");
+
     while (!glfwWindowShouldClose(_window))
     {
         static int frame = 0;
@@ -708,7 +920,45 @@ int Rasteriser::Show() {
             player_->Update(delta_time);
         }
 
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        // ===== SHADOW PASS: Render scene from light's perspective =====
+        if (shadow_program_ != 0) {
+            glUseProgram(shadow_program_);
+            glViewport(0, 0, shadow_width_, shadow_height_);
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo_shadow_map_);
+            glClear(GL_DEPTH_BUFFER_BIT);
+
+            // Disable culling for shadow pass to render all geometry
+            glDisable(GL_CULL_FACE);
+
+            // Use polygon offset to help with shadow acne
+            glEnable(GL_POLYGON_OFFSET_FILL);
+            glPolygonOffset(2.0f, 4.0f);
+
+            // Render all opaque objects to shadow map
+            auto shadow_view = registry_.view<component::Transform, component::Mesh>(entt::exclude<component::Grass>);
+            for (auto [entity, transform, mesh_component] : shadow_view.each()) {
+                glm::mat4 M = transform.get_world_matrix(registry_, entity);
+                glm::mat4 mlp = light_space_matrix * M;  // Model-Light-Projection
+
+                SetMatrix4x4(shadow_program_, glm::value_ptr(mlp), "mlp");
+
+                for (const auto& glmesh : mesh_component.gl_meshes) {
+                    glBindVertexArray(glmesh.vao);
+                    glDrawElements(GL_TRIANGLES, glmesh.mesh->index_buffer_count(), GL_UNSIGNED_INT, 0);
+                }
+            }
+
+            // Restore state
+            glDisable(GL_POLYGON_OFFSET_FILL);
+            glEnable(GL_CULL_FACE);
+
+            // Reset to default framebuffer and viewport
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, width_, height_);
+        }
+
+        // ===== MAIN PASS: Render scene with shadows =====
+        glClearColor(0.2f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Get matrices from camera (now controlled by player)
@@ -717,9 +967,10 @@ int Rasteriser::Show() {
         glm::vec3 camera_pos = camera_->GetPosition();
 
         // ===== PASS 0: Render skybox (environment background) =====
-        if (skybox_shader_program_ != 0 && skybox_texture_handle_ != 0) {
+        if (skybox_shader_program_ != 0) {
             // Disable depth writing (skybox is always at infinity)
             glDepthMask(GL_FALSE);
+            glDepthFunc(GL_LEQUAL);  // Render at far plane
             glDisable(GL_CULL_FACE);
 
             glUseProgram(skybox_shader_program_);
@@ -729,7 +980,7 @@ int Rasteriser::Show() {
             glm::mat4 inv_VP = glm::inverse(VP);
             SetMatrix4x4(skybox_shader_program_, glm::value_ptr(inv_VP), "inv_VP");
 
-            // Set skybox texture handle
+            // Set skybox texture handle (0 if no texture - shader has fallback)
             GLint loc = glGetUniformLocation(skybox_shader_program_, "skybox_texture");
             if (loc != -1) {
                 glUniform2ui(loc,
@@ -737,11 +988,12 @@ int Rasteriser::Show() {
                     static_cast<GLuint>(skybox_texture_handle_ >> 32));
             }
 
-            // Draw fullscreen triangle
+            // Draw fullscreen triangle (uses gl_VertexID in shader)
             glBindVertexArray(skybox_vao_);
             glDrawArrays(GL_TRIANGLES, 0, 3);
 
             // Restore state
+            glDepthFunc(GL_LESS);
             glDepthMask(GL_TRUE);
             glEnable(GL_CULL_FACE);
         }
@@ -755,16 +1007,22 @@ int Rasteriser::Show() {
         glm::vec3 light_color(1.8f, 1.8f, 1.7f);  // Bright warm sunlight
         SetVector3(default_shader_program_, glm::value_ptr(light_color), "light_color");
 
-        glm::vec3 ambient(0.5f, 0.5f, 0.55f);  // Strong ambient for good fill
+        glm::vec3 ambient(0.25f, 0.25f, 0.3f);  // Reduced ambient for visible shadows
         SetVector3(default_shader_program_, glm::value_ptr(ambient), "ambient_color");
-
 
         // Set camera uniforms
         SetMatrix4x4(default_shader_program_, glm::value_ptr(V), "V");
         SetMatrix4x4(default_shader_program_, glm::value_ptr(P), "P");
         SetVector3(default_shader_program_, glm::value_ptr(camera_pos), "camera_pos_ws");
 
-        // ===== PASS 1: Render opaque objects (non-grass) =====
+        // Set light space matrix for shadow mapping
+        SetMatrix4x4(default_shader_program_, glm::value_ptr(light_space_matrix), "light_space_matrix");
+
+        // Bind shadow map
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, tex_shadow_map_);
+
+        // ===== Render opaque objects (non-grass) =====
         auto opaque_view = registry_.view<component::Transform, component::Mesh>(entt::exclude<component::Grass>);
         for (auto [entity, transform, mesh_component] : opaque_view.each()) {
             glm::mat4 M = transform.get_world_matrix(registry_, entity);
@@ -779,7 +1037,7 @@ int Rasteriser::Show() {
             }
         }
 
-        // ===== PASS 2: Render transparent objects (grass) with blending =====
+        // ===== Render transparent objects (grass) with blending =====
         if (grass_shader_program_ != 0) {
             // Enable alpha blending
             glEnable(GL_BLEND);
@@ -802,8 +1060,13 @@ int Rasteriser::Show() {
             // Set time uniform for wind animation
             SetFloat(grass_shader_program_, current_time, "time");
 
+            // Set shadow uniforms for grass
+            SetMatrix4x4(grass_shader_program_, glm::value_ptr(light_space_matrix), "light_space_matrix");
+            SetSampler(grass_shader_program_, 3, "shadow_map");
+
             // Render grass entities
             auto grass_view = registry_.view<component::Transform, component::Mesh, component::Grass>();
+
             for (auto [entity, transform, mesh_component] : grass_view.each()) {
                 glm::mat4 M = transform.get_world_matrix(registry_, entity);
                 glm::mat3 Mn = glm::transpose(glm::inverse(glm::mat3(M)));
@@ -820,6 +1083,39 @@ int Rasteriser::Show() {
             // Restore state
             glDisable(GL_BLEND);
             glEnable(GL_CULL_FACE);
+        }
+
+        // ===== Render rain particles =====
+        if (rain_shader_program_ != 0 && rain_vao_ != 0) {
+            // Update rain particles
+            UpdateRainParticles(delta_time, camera_pos);
+
+            // Enable blending for transparent rain
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+            // Disable depth writing but keep depth testing
+            glDepthMask(GL_FALSE);
+
+            // Enable point sprites
+            glEnable(GL_PROGRAM_POINT_SIZE);
+
+            glUseProgram(rain_shader_program_);
+
+            // Set uniforms
+            glm::mat4 VP = P * V;
+            SetMatrix4x4(rain_shader_program_, glm::value_ptr(VP), "VP");
+            SetVector3(rain_shader_program_, glm::value_ptr(camera_pos), "camera_pos");
+            SetFloat(rain_shader_program_, current_time, "time");
+
+            // Draw rain particles as points
+            glBindVertexArray(rain_vao_);
+            glDrawArrays(GL_POINTS, 0, RAIN_PARTICLE_COUNT);
+
+            // Restore state
+            glDisable(GL_PROGRAM_POINT_SIZE);
+            glDepthMask(GL_TRUE);
+            glDisable(GL_BLEND);
         }
 
         glfwSwapBuffers(_window);
